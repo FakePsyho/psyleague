@@ -195,7 +195,10 @@ def play_game(bots: List[str], verbose: bool=False) -> Game:
     if verbose:
         print(f'Playing Game: {cmd}')
     
-    task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    if os.name == 'nt':
+        task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    else:
+        task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
             
     if task.returncode:
         print(f'Fatal Error: Play Game command {cmd} returned with return code {task.returncode}')

@@ -1,4 +1,4 @@
 [0.1.1]
-* bugfixes (psyleague config, installation)
+* bugfixes (psyleague config, psyleague bot update -d, installation, linux support)
 [0.1.0] 
 * initial version
