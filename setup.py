@@ -7,7 +7,7 @@ setup(
     package_data = {'psyleague': ['psyleague.cfg']},
     version = __version__,
     license = 'MIT',
-    description = "Local tester for Topcoder Marathons & AtCoder Heuristic Contests",
+    description = "Local league system for bot contests.",
     author = 'Psyho',
     url = 'https://github.com/FakePsyho/psyleague',
     keywords = ['CompetitiveProgramming', 'CodinGame', 'Tester'],
