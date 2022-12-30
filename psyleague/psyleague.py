@@ -121,8 +121,8 @@ class Game:
     
 # [Section] "DB" functions
 
-def load_config() -> Dict[str, Any]:
-    with open(CONFIG_FILE, 'r') as f:
+def load_config(path: str) -> Dict[str, Any]:
+    with open(path, 'r') as f:
         return toml.load(f);
     
 lock_args = {'timeout': 2.0, 'check_interval': 0.02}
@@ -455,12 +455,16 @@ def _main() -> None:
     
     if not args.func:
         parser.print_help()
-        return
+        return 
     
     # load config
     if args.func != mode_config:
+        if not os.path.exists(CONFIG_FILE):
+            print('Missing config file, please run "psyleague config" to create a config file in you current directory')
+            return
+    
         global cfg
-        cfg = load_config()
+        cfg = load_config(CONFIG_FILE)
         assert cfg['version'] == __version__, 'Version of the config file doesn\'t match psyleague version'
     
     args.func()
