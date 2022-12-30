@@ -412,9 +412,12 @@ def mode_bot() -> None:
 
 def mode_show() -> None:
     log('[Action] Show')
-    bots = load_db()
+    bots = load_db().values()
+    
+    if args.active:
+        bots = [b for b in bots if b.active]
 
-    ranking = sorted(bots.values(), key=lambda b: b.mu-3*b.sigma, reverse=True)
+    ranking = sorted(bots, key=lambda b: b.mu-3*b.sigma, reverse=True)
 
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
