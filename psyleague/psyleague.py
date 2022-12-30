@@ -309,9 +309,9 @@ def mode_run() -> None:
                     bots[name].active = 0
                     save_db(bots)
                 elif msg_type == 'UPDATE_BOT':
-                    name = a[2]
-                    new_name = a[3] # XXX: OPERATION NOT SUPPORTED
-                    description = a[4]
+                    name = a[1]
+                    new_name = a[2] # XXX: OPERATION NOT SUPPORTED
+                    description = a[3]
                     bots[name].description = description
                     save_db(bots)
                 else:
