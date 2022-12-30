@@ -238,7 +238,7 @@ def choose_match(bots: Dict[str, Bot]) -> List[str]:
 def mode_config() -> None:
     source_path = os.path.join(os.path.dirname(__file__), 'psyleague.cfg')
     target_path = os.path.join(os.getcwd(), 'psyleague.cfg')
-    if os.file.exists(target_path):
+    if os.path.exists(target_path):
         print('Config file already exist')
         return
     print(f'Creating new config file at psyleague.cfg')
@@ -450,18 +450,18 @@ def _main() -> None:
     parser_show.add_argument('-l', '--limit', type=int, default=None, help='limits ranking to top X bots')
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
 
-    # load config
-    global cfg
-    cfg = load_config()
-    
-    assert cfg['version'] == __version__, 'Version of the config file doesn\'t match psyleague version'
-    
     global args
     args = parser.parse_args()
-
+    
     if not args.func:
         parser.print_help()
         return
+    
+    # load config
+    if args.func != mode_config:
+        global cfg
+        cfg = load_config()
+        assert cfg['version'] == __version__, 'Version of the config file doesn\'t match psyleague version'
     
     args.func()
 
