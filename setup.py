@@ -1,5 +1,5 @@
 from setuptools import setup
-from psyleague.psyleague import __version__
+__version__ = '0.1.1'
 
 setup(
     name = 'psyleague',

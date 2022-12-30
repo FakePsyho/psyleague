@@ -8,7 +8,7 @@ version = sys.argv[1]
 
 assert re.match('^[0-9]+\.[0-9]+\.[0-9]+', version)
 
-for path in glob.glob('psyleague/*.cfg') + ['psyleague/psyleague.py']:
+for path in glob.glob('psyleague/*.cfg') + ['psyleague/psyleague.py'] + ['setup.py']:
     with open(path, 'r') as f:
         lines = f.readlines()
 
