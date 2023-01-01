@@ -105,18 +105,18 @@ class Bot:
 
     
 class Game:
-    def __init__(self, p1=None, p2=None, rank1=None, rank2=None, *, str=None):
+    def __init__(self, p1=None, p2=None, score1=None, score2=None, *, str=None):
         self.p1 = p1
         self.p2 = p2
-        self.rank1 = rank1
-        self.rank2 = rank2
+        self.score1 = score1
+        self.score2 = score2
         if str:
-            self.p1, self.p2, self.rank1, self.rank2 = str.split()
-            self.rank1 = int(self.rank1)
-            self.rank2 = int(self.rank2)
+            self.p1, self.p2, self.score1, self.score2 = str.split()
+            self.score1 = float(self.score2)
+            self.score2 = float(self.score2)
             
     def __repr__(self):
-        return f'{self.p1} {self.p2} {self.rank1} {self.rank2}'
+        return f'{self.p1} {self.p2} {self.score1} {self.score2}'
     
     
 # [Section] "DB" functions
@@ -175,7 +175,13 @@ def load_db() -> Dict[str, Bot]:
 def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
     if cfg['model'] == 'trueskill':
         ts.setup(tau=cfg['tau'], draw_probability=cfg['draw_prob'])
-        ratings = ts.rate([[bots[game.p1].to_ts()], [bots[game.p2].to_ts()]], ranks=[game.rank1, game.rank2])
+        if game.score1 > game.score2:
+            ranks=[0,1]
+        elif game.score2 > game.score1:
+            ranks=[1,0]
+        else:
+            ranks=[0,0]
+        ratings = ts.rate([[bots[game.p1].to_ts()], [bots[game.p2].to_ts()]], ranks=ranks)
         bots[game.p1].update(ratings[0][0])
         bots[game.p2].update(ratings[1][0])
     else:
@@ -208,8 +214,8 @@ def play_game(bots: List[str], verbose: bool=False) -> Game:
     if verbose:
         print(f'{cmd} produced output: {output}')
     
-    ranks = [int(v) for v in output.split()]
-    return Game(bots[0], bots[1], ranks[0], ranks[1])
+    scores = [float(v) for v in output.split()]
+    return Game(bots[0], bots[1], scores[0], scores[1])
 
 
 # TODO: restore proper matchmaking 
@@ -332,7 +338,7 @@ def mode_run() -> None:
                 while True:
                     game = results_queue.get(block=False)
                     if args.verbose:
-                        print(f'Processing result: {game.p1} vs {game.p2}, outcome: {game.rank1} {game.rank2}')
+                        print(f'Processing result: {game.p1} vs {game.p2}, outcome: {game.score1} {game.score2}')
                     add_game(game)
                     update_ranking(bots, game)
                     save_db(bots) 
