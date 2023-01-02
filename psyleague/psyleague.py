@@ -427,21 +427,58 @@ def mode_show() -> None:
     log('[Action] Show')
     bots = load_db().values()
     
-    if args.active:
-        bots = [b for b in bots if b.active]
-
     ranking = sorted(bots, key=lambda b: b.mu-3*b.sigma, reverse=True)
 
+    # headers = ['Pos', 'Name', 'Score', 'Games', 'Mu', 'Sigma', 'Errors', 'Description']
+    # table = []
+    # if args.limit is None:
+        # args.limit = len(ranking)
+    # for i, b in enumerate(ranking[0:args.limit]):
+        # table.append([i+1, b.name, b.mu-3*b.sigma, b.games, b.mu, b.sigma, b.errors, b.description])
+    # print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
+    
+    
+    if args.active:
+        bots = [b for b in bots if b.active]
+    if args.limit is None:
+        args.limit = len(ranking)
+    ranking = ranking[:args.limit]
+        
+    columns = {}
+    columns['pos'] = ('Pos', list(range(1, 1+len(ranking))))
+    columns['name'] = ('Name', [b.name for b in ranking])
+    columns['score'] = ('Score', [b.mu-3*b.sigma for b in ranking])
+    columns['games'] = ('Games', [b.games for b in ranking])
+    columns['mu'] = ('Mu', [b.mu for b in ranking])
+    columns['sigma'] = ('Sigma', [b.sigma for b in ranking])
+    columns['errors'] = ('Errors', [b.errors for b in ranking])
+    columns['active'] = ('Active', [b.active for b in ranking])
+    columns['description'] = ('Description', [b.description for b in ranking])
+    
+    headers = []
+    table = []
+    for column_name in cfg['leaderboard'].split(','):
+        column_name = column_name.lower()
+        optional = False
+        if column_name[-1] == '?':
+            optional = True
+            column_name = column_name[:-1]
+        if column_name not in columns:
+            print(f'Unknown column name: {column_name}, please correct the leaderboard option')
+            os.exit(1)
+        h, c = columns[column_name]
+        if optional and c.count(c[0]) == len(c):
+            continue
+        headers.append(h)
+        table.append(c)
+        
+    table = list(map(list, zip(*table))) #transpose
+        
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
 
-    headers = ['Pos', 'Name', 'Score', 'Games', 'Mu', 'Sigma', 'Errors', 'Description']
-    table = []
-    if args.limit is None:
-        args.limit = len(ranking)
-    for i, b in enumerate(ranking[0:args.limit]):
-        table.append([i+1, b.name, b.mu-3*b.sigma, b.games, b.mu, b.sigma, b.errors, b.description])
     print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
+    
 
 
 def _main() -> None:
