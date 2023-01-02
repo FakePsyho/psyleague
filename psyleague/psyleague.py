@@ -429,15 +429,6 @@ def mode_show() -> None:
     
     ranking = sorted(bots, key=lambda b: b.mu-3*b.sigma, reverse=True)
 
-    # headers = ['Pos', 'Name', 'Score', 'Games', 'Mu', 'Sigma', 'Errors', 'Description']
-    # table = []
-    # if args.limit is None:
-        # args.limit = len(ranking)
-    # for i, b in enumerate(ranking[0:args.limit]):
-        # table.append([i+1, b.name, b.mu-3*b.sigma, b.games, b.mu, b.sigma, b.errors, b.description])
-    # print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
-    
-    
     if args.active:
         bots = [b for b in bots if b.active]
     if args.limit is None:
@@ -472,7 +463,7 @@ def mode_show() -> None:
         headers.append(h)
         table.append(c)
         
-    table = list(map(list, zip(*table))) #transpose
+    table = list(zip(*table)) #transpose
         
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
