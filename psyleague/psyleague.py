@@ -11,6 +11,8 @@
 # -add more ranking models (openskill)
 # -find a good ranking model for fixed-skill bots
 # -add comments to config file
+# -add a way to add information about the game (info about generated map), similar system to [DATA] in mmtester
+# -add a way to filer results by test type
 
 # LOW PRIORITY
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
@@ -77,21 +79,22 @@ class RollingStat:
 # [Section] Container classes
 
 class Bot:
-    def __init__(self, name, description, mu=25.0, sigma=8.333, games=0, active=1):
+    def __init__(self, name, description, mu=25.0, sigma=25/3, games=0, errors=0, active=1):
         self.name = name
         self.description = description
         self.mu = mu
         self.sigma = sigma
         self.games = games
+        self.errors = errors
         self.active = active
         
     @classmethod
     def from_str(cls, input):
         a = [s.strip() for s in input.split(':')]
-        return cls(a[0], a[1], float(a[2]), float(a[3]), int(a[4]), int(a[5]))
+        return cls(a[0], a[1], float(a[2]), float(a[3]), int(a[4]), int(a[5]), int(a[6]))
         
     def __repr__(self):
-        return f'{self.name} : {self.description} : {self.mu} : {self.sigma} : {self.games} : {self.active}'
+        return f'{self.name} : {self.description} : {self.mu} : {self.sigma} : {self.games} : {self.errors} : {self.active}'
         
     def to_ts(self) -> ts.Rating:
         return ts.Rating(mu=self.mu, sigma=self.sigma)
@@ -105,18 +108,26 @@ class Bot:
 
     
 class Game:
-    def __init__(self, p1=None, p2=None, rank1=None, rank2=None, *, str=None):
+    def __init__(self, p1=None, p2=None, rank1=None, rank2=None, error1=0, error2=0, *, str=None):
         self.p1 = p1
         self.p2 = p2
         self.rank1 = rank1
         self.rank2 = rank2
+        self.error1 = error1
+        self.error2 = error2
         if str:
-            self.p1, self.p2, self.rank1, self.rank2 = str.split()
-            self.rank1 = int(self.rank1)
-            self.rank2 = int(self.rank2)
+            v = str.split()
+            self.p1 = v[0]
+            self.p2 = v[1]
+            self.rank1 = int(v[2])
+            self.rank2 = int(v[3])
+            if len(v) >= 5:
+                self.error1 = int(v[4])
+            if len(v) >= 6:
+                self.error2 = int(v[5])
             
     def __repr__(self):
-        return f'{self.p1} {self.p2} {self.rank1} {self.rank2}'
+        return f'{self.p1} {self.p2} {self.rank1} {self.rank2} {self.error1} {self.error2}'
     
     
 # [Section] "DB" functions
@@ -183,6 +194,8 @@ def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
         
     bots[game.p1].games += 1
     bots[game.p2].games += 1
+    bots[game.p1].errors += game.error1
+    bots[game.p2].errors += game.error2
     
 
 def play_game(bots: List[str], verbose: bool=False) -> Game:
@@ -208,8 +221,8 @@ def play_game(bots: List[str], verbose: bool=False) -> Game:
     if verbose:
         print(f'{cmd} produced output: {output}')
     
-    ranks = [int(v) for v in output.split()]
-    return Game(bots[0], bots[1], ranks[0], ranks[1])
+    data = [int(v) for v in output.split()]
+    return Game(bots[0], bots[1], *data)
 
 
 # TODO: restore proper matchmaking 
@@ -422,12 +435,12 @@ def mode_show() -> None:
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
 
-    headers = ['Pos', 'Name', 'Score', 'Games', 'Mu', 'Sigma', 'Description']
+    headers = ['Pos', 'Name', 'Score', 'Games', 'Mu', 'Sigma', 'Errors', 'Description']
     table = []
     if args.limit is None:
         args.limit = len(ranking)
     for i, b in enumerate(ranking[0:args.limit]):
-        table.append([i+1, b.name, b.mu-3*b.sigma, b.games, b.mu, b.sigma, b.description])
+        table.append([i+1, b.name, b.mu-3*b.sigma, b.games, b.mu, b.sigma, b.errors, b.description])
     print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
 
 

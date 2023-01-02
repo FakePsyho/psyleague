@@ -1,4 +1,5 @@
 [WIP]
+* add support for getting error data (requires update play_game script!)
 * fix: psyleague show --active
 [0.1.1]
 * bugfixes: psyleague config, psyleague bot update -d, installation, linux support
