@@ -38,6 +38,7 @@ import random
 import datetime
 import re
 import argparse
+import sys
 import os.path
 import subprocess
 import queue
@@ -271,6 +272,8 @@ def mode_run() -> None:
     games = load_all_games()
     
     games_played = 0
+    games_total = args.games or sys.maxsize
+    games_left = games_total
     games_stat = RollingStat(60.0)
     last_msg_time = time.time()
     
@@ -303,10 +306,6 @@ def mode_run() -> None:
         while True:
             time.sleep(0.1)
             
-            if not args.silent and not args.verbose:
-                active_bots = sum([1 for b in bots.values() if b.active])
-                print(f'\rActive Bots: {active_bots}  Games since launch: {games_played}  Games in the last 60s: {games_stat.get_count()}                    \r', end='')
-            
             # retrieve and process all messages
             for msg in receive_msgs():
                 if not args.silent:
@@ -334,11 +333,14 @@ def mode_run() -> None:
                     assert False, f'Unknown message type: {msg_type}'
                 
             # add new games to the queue
-            while games_queue.qsize() < cfg['n_workers'] * 2:
+            while games_queue.qsize() < cfg['n_workers'] * 2 and games_left > 0:
                 players = choose_match(bots)
                 if players is None: 
                     break
+                games_left -= 1
                 games_queue.put(players)
+            # TODO: add games_left == 0 handling
+                
             
             # process results
             try:
@@ -353,29 +355,37 @@ def mode_run() -> None:
                     games_stat.add()
             except queue.Empty:
                 pass
+                
+            if not args.silent and not args.verbose:
+                active_bots = sum([1 for b in bots.values() if b.active])
+                print(f'\rActive Bots: {active_bots}  Games since launch: {games_played}{f" / {games_total}" if args.games else ""}  Games in the last 60s: {games_stat.get_count()}                    \r', end='')
+            
+            if games_played >= games_total:
+                break
             
     except KeyboardInterrupt:
         print('\nInterrupted by user, waiting for all workers to finish!')
         print('If this doesn\'t happen, press Ctrl+C again to kill all of the workers')
-        try:
-            while True:
-                games_queue.get(block=False)
-        except:
-            pass
-            
-        try:
-            for _ in workers:
-                games_queue.put(None)
-            for worker in workers:
-                worker.join()
-        except:
-            os._exit(1)
         
     except:
         print('\nFatal Error in the main thread')
         traceback.print_exc()
         os._exit(1)
 
+    # stop running any new games
+    try:
+        while True:
+            games_queue.get(block=False)
+    except:
+        pass
+        
+    try:
+        for _ in workers:
+            games_queue.put(None)
+        for worker in workers:
+            worker.join()
+    except:
+        os._exit(1)
 
 def mode_bot() -> None:
     if args.cmd == 'add':
@@ -430,11 +440,10 @@ def mode_show() -> None:
     ranking = sorted(bots, key=lambda b: b.mu-3*b.sigma, reverse=True)
 
     if args.active:
-        bots = [b for b in bots if b.active]
-    if args.limit is None:
-        args.limit = len(ranking)
-    ranking = ranking[:args.limit]
-        
+        ranking = [b for b in ranking if b.active]
+    if args.limit:
+        ranking = ranking[:args.limit]
+    
     columns = {}
     columns['pos'] = ('Pos', list(range(1, 1+len(ranking))))
     columns['name'] = ('Name', [b.name for b in ranking])
@@ -484,6 +493,7 @@ def _main() -> None:
     parser_run.set_defaults(func=mode_run)
     parser_run.add_argument('-s', '--silent', action='store_true', help='turns off all of the messages')
     parser_run.add_argument('-v', '--verbose', action='store_true', help='shows extra information, good for debugging')
+    parser_run.add_argument('-g', '--games', type=int, default=None, help='if specified, number of games to run after which psyleague should finish running')
 
     parser_bot = subparsers.add_parser('bot', aliases=['b'], help='commands related to adding/stopping/updating bots')
     parser_bot.set_defaults(func=mode_bot)

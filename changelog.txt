@@ -1,7 +1,8 @@
 [WIP]
 * add support for getting error data (requires update of play_game script!)
 * show: support for custom leaderboard, new leaderboard config option defines columns to show
-* fix: psyleague show --active
+* run: can run a fixed number of games with --games
+* bugfix: psyleague show --active
 [0.1.1]
 * bugfixes: psyleague config, psyleague bot update -d, installation, linux support
 [0.1.0] 
