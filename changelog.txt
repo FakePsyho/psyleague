@@ -1,8 +1,10 @@
 [WIP]
 * add support for getting error data (requires update of play_game script!)
+* run: can run a fixed number of games with --games
 * show: support for custom leaderboard, new leaderboard config option defines columns to show
 * show: you can see bot's creation date, change the format with date_format config option
-* run: can run a fixed number of games with --games
+* show: --limit -> --best
+* show: added --recent to show the most recent X created bots
 * bugfix: psyleague show --active had no effect
 * bugfix: logs show your local timezone now
 [0.1.1]

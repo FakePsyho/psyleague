@@ -442,8 +442,15 @@ def mode_show() -> None:
 
     if args.active:
         ranking = [b for b in ranking if b.active]
-    if args.limit:
-        ranking = ranking[:args.limit]
+        
+    if args.best:
+        ranking = ranking[:args.best]
+        
+    if args.recent:
+        ranking = sorted(ranking, key=lambda b: b.cdate, reverse=True)
+        ranking = ranking[:args.recent]
+        
+        
     
     columns = {}
     columns['pos'] = ('Pos', list(range(1, 1+len(ranking))))
@@ -512,7 +519,9 @@ def _main() -> None:
     parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots')
     parser_show.set_defaults(func=mode_show)
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
-    parser_show.add_argument('-l', '--limit', type=int, default=None, help='limits ranking to top X bots')
+    parser_show_xgroup = parser_show.add_mutually_exclusive_group()
+    parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
+    parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
 
     global args
     args = parser.parse_args()
