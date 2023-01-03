@@ -35,7 +35,6 @@ import copy
 import time
 import shutil
 import random
-import datetime
 import re
 import argparse
 import sys
@@ -43,6 +42,7 @@ import os.path
 import subprocess
 import queue
 import traceback
+from datetime import datetime
 from threading import Thread
 from typing import List, Dict, Tuple, Any
 
@@ -80,7 +80,7 @@ class RollingStat:
 # [Section] Container classes
 
 class Bot:
-    def __init__(self, name, description, mu=25.0, sigma=25/3, games=0, errors=0, active=1):
+    def __init__(self, name, description, mu=25.0, sigma=25/3, games=0, errors=0, active=1, cdate=None):
         self.name = name
         self.description = description
         self.mu = mu
@@ -88,14 +88,15 @@ class Bot:
         self.games = games
         self.errors = errors
         self.active = active
+        self.cdate = cdate or datetime.now()
         
     @classmethod
     def from_str(cls, input):
         a = [s.strip() for s in input.split(':')]
-        return cls(a[0], a[1], float(a[2]), float(a[3]), int(a[4]), int(a[5]), int(a[6]))
+        return cls(a[0], a[1], float(a[2]), float(a[3]), int(a[4]), int(a[5]), int(a[6]), datetime.strptime(a[7], '%Y-%m-%d %H-%M-%S'))
         
     def __repr__(self):
-        return f'{self.name} : {self.description} : {self.mu} : {self.sigma} : {self.games} : {self.errors} : {self.active}'
+        return f'{self.name} : {self.description} : {self.mu} : {self.sigma} : {self.games} : {self.errors} : {self.active} : {self.cdate.strftime("%Y-%m-%d %H-%M-%S")}'
         
     def to_ts(self) -> ts.Rating:
         return ts.Rating(mu=self.mu, sigma=self.sigma)
@@ -141,7 +142,7 @@ lock_args = {'timeout': 2.0, 'check_interval': 0.02}
     
 def log(*args) -> None:
     with portalocker.Lock(cfg['file_log'], 'a', **lock_args) as f:
-        dt = datetime.datetime.utcnow().replace(microsecond=0)
+        dt = datetime.now().replace(microsecond=0)
         f.write('[' + str(dt) + '] ' + ' '.join(map(str, args)) + '\n')
 
 def send_msg(msg: str) -> None:
@@ -454,6 +455,12 @@ def mode_show() -> None:
     columns['errors'] = ('Errors', [b.errors for b in ranking])
     columns['active'] = ('Active', [b.active for b in ranking])
     columns['description'] = ('Description', [b.description for b in ranking])
+    try:
+        columns['date'] = ('Created', [b.cdate.strftime(cfg['date_format']) for b in ranking])
+    except ValueError:
+        print(f'Your date_format: "{cfg["date_format"]}" is invalid')
+        sys.exit(1)
+        
     
     headers = []
     table = []
@@ -465,7 +472,7 @@ def mode_show() -> None:
             column_name = column_name[:-1]
         if column_name not in columns:
             print(f'Unknown column name: {column_name}, please correct the leaderboard option')
-            os.exit(1)
+            sys.exit(1)
         h, c = columns[column_name]
         if optional and c.count(c[0]) == len(c):
             continue
@@ -504,8 +511,8 @@ def _main() -> None:
 
     parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots')
     parser_show.set_defaults(func=mode_show)
-    parser_show.add_argument('-l', '--limit', type=int, default=None, help='limits ranking to top X bots')
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
+    parser_show.add_argument('-l', '--limit', type=int, default=None, help='limits ranking to top X bots')
 
     global args
     args = parser.parse_args()
