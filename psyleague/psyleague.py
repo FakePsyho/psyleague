@@ -77,7 +77,7 @@ class RollingStat:
         return len(self.data)
     
 
-# [Section] Container classes
+#region Container classes
 
 class Bot:
     def __init__(self, name, description, mu=25.0, sigma=25/3, games=0, errors=0, active=1, cdate=None):
@@ -131,8 +131,9 @@ class Game:
     def __repr__(self):
         return f'{self.p1} {self.p2} {self.rank1} {self.rank2} {self.error1} {self.error2}'
     
-    
-# [Section] "DB" functions
+#endregion    
+
+#region "DB" functions
 
 def load_config(path: str) -> Dict[str, Any]:
     with open(path, 'r') as f:
@@ -182,8 +183,9 @@ def load_db() -> Dict[str, Bot]:
     bots = [Bot.from_str(line.strip()) for line in data]
     return {b.name: b for b in bots}    
 
+#endregion
 
-# [Section] helper functions
+#region helper functions
     
 def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
     if cfg['model'] == 'trueskill':
@@ -250,8 +252,9 @@ def choose_match(bots: Dict[str, Bot]) -> List[str]:
    
     return [p1.name, p2.name] if random.random() < 0.5 else [p2.name, p1.name]
 
+#endregion
 
-# [Section] Mode functions
+#region Mode functions
 
 def mode_config() -> None:
     source_path = os.path.join(os.path.dirname(__file__), 'psyleague.cfg')
@@ -492,6 +495,8 @@ def mode_show() -> None:
         tabulate.MIN_PADDING = 0
 
     print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
+
+#endregion
     
 
 
