@@ -37,11 +37,10 @@
 __version__ = '0.2.0'
 
 import signal
-import copy
 import time
 import shutil
 import random
-import re
+import json
 import argparse
 import sys
 import os.path
@@ -117,26 +116,28 @@ class Bot:
     
 class Game:
     def __init__(self, p1=None, p2=None, rank1=None, rank2=None, error1=0, error2=0, *, str=None):
-        self.p1 = p1
-        self.p2 = p2
-        self.rank1 = rank1
-        self.rank2 = rank2
-        self.error1 = error1
-        self.error2 = error2
+        self.players = [p1, p2]
+        self.ranks = [rank1, rank2]
+        self.errors = [error1, error2]
+        self.test_data = {}
+        self.player_data = [{}, {}]
         if str:
-            v = str.split()
-            self.p1 = v[0]
-            self.p2 = v[1]
-            self.rank1 = int(v[2])
-            self.rank2 = int(v[3])
-            if len(v) >= 5:
-                self.error1 = int(v[4])
-            if len(v) >= 6:
-                self.error2 = int(v[5])
+            if str[0] == '{':
+                data = json.loads(str)
+                self.players = data['players']
+                self.ranks = data['ranks']
+                self.errors = data['errors']
+                self.test_data = data['test_data']
+                self.player_data = data['player_data']
+            else:
+                v = str.split()
+                self.players = [v[0], v[1]]
+                self.ranks = [int(v[2]), int(v[3])]
+                if len(v) >= 5:
+                    self.errors = [int(v[4]), int(v[5])]
             
     def __repr__(self):
-        return f'{self.p1} {self.p2} {self.rank1} {self.rank2} {self.error1} {self.error2}'
-    
+        return json.dumps(self.__dict__)    
 #endregion    
 
 #region "DB" functions
@@ -201,16 +202,16 @@ def load_db() -> Dict[str, Bot]:
 def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
     if cfg['model'] == 'trueskill':
         ts.setup(tau=cfg['tau'], draw_probability=cfg['draw_prob'])
-        ratings = ts.rate([[bots[game.p1].to_ts()], [bots[game.p2].to_ts()]], ranks=[game.rank1, game.rank2])
-        bots[game.p1].update(ratings[0][0])
-        bots[game.p2].update(ratings[1][0])
+        ratings = ts.rate([[bots[game.players[0]].to_ts()], [bots[game.players[1]].to_ts()]], ranks=[game.ranks[0], game.ranks[1]])
+        bots[game.players[0]].update(ratings[0][0])
+        bots[game.players[1]].update(ratings[1][0])
     else:
         assert False, f'Invalid rating model: {cfg["model"]}'
         
-    bots[game.p1].games += 1
-    bots[game.p2].games += 1
-    bots[game.p1].errors += game.error1
-    bots[game.p2].errors += game.error2
+    bots[game.players[0]].games += 1
+    bots[game.players[1]].games += 1
+    bots[game.players[0]].errors += game.errors[0]
+    bots[game.players[1]].errors += game.errors[1]
     
 
 def play_game(bots: List[str], verbose: bool=False) -> Game:
@@ -349,10 +350,10 @@ def mode_run() -> None:
                         del bots[name]
                         games = load_all_games()
                         for g in games:
-                            if g.p1 == name:
-                                g.p1 = new_name
-                            if g.p2 == name:
-                                g.p2 = new_name
+                            if g.players[0] == name:
+                                g.players[0] = new_name
+                            if g.players[1] == name:
+                                g.players[1] = new_name
                         save_all_game(games)
                     save_db(bots)
                 else:
@@ -373,9 +374,9 @@ def mode_run() -> None:
                 while True:
                     game = results_queue.get(block=False)
                     if args.verbose:
-                        print(f'Processing result: {game.p1} vs {game.p2}, outcome: {game.rank1} {game.rank2}')
-                    if game.p1 not in bots or game.p2 not in bots:
-                        print(f'Warning: Unknown bot in game: {game.p1} vs {game.p2}; skipping game')
+                        print(f'Processing result: {game.players[0]} vs {game.players[1]}, outcome: {game.ranks[0]} {game.ranks[1]}')
+                    if game.players[0] not in bots or game.players[1] not in bots:
+                        print(f'Warning: Unknown bot in game: {game.players[0]} vs {game.players[1]}; skipping game')
                         continue
                     add_game(game)
                     update_ranking(bots, game)
@@ -477,8 +478,6 @@ def mode_show() -> None:
     if args.recent:
         ranking = sorted(ranking, key=lambda b: b.cdate, reverse=True)
         ranking = ranking[:args.recent]
-        
-        
     
     columns = {}
     columns['pos'] = ('Pos', list(range(1, 1+len(ranking))))
