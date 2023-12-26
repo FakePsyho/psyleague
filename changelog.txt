@@ -1,3 +1,5 @@
+[current]
+* bot update: -n/--new_name renames bot (this is only partially supported as this doesn't change the bot executable file; warning: potentially very slow as this has to update whole .games file)
 [0.2.0]
 * add support for getting error data (requires update of play_game script!)
 * run: can run a fixed number of games with --games

@@ -1,30 +1,36 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
+
+# Author: Psyho
+# Twitter: https://twitter.com/fakepsyho
 
 #TODO:
 # HIGH PRIORITY
+# -add a way to return results of multiple games with a single call to the script
 # -add mode for displaying stats for particular bot
 # -better argparse help
 # -add a nice way of renaming bots (requires updating games history :/)
-# -create github repo
-# -create psyleague pypi package 
-# -choose_match: update matchmaking (more priority to top bots 
+# -choose_match: update matchmaking (more priority to top bots)
 # -add more ranking models (openskill)
 # -find a good ranking model for fixed-skill bots
 # -add comments to config file
-# -add a way to add information about the game (info about generated map), similar system to [DATA] in mmtester
+# -add a way to add information about the game (info about generated map), similar system to [DATA] in psytester
 # -add a way to filer results by test type
+# -play_game.py could return json as well (easier in case of returning more data?); if it starts with { assume it's json
+# -add a bot having only an executable? (allows for bots without source code / in a different language)
+# -change psyleague.db format to csv?
 
 # LOW PRIORITY
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
 # -add support for n-player games 
 # -wrapper for \r printing
-# -add a nice way of permanently deleting a bot (requires recalculating of the whole ranking :/ )
+# -add a nice way of permanently deleting a bot (requires recalculation of the whole ranking :/ )
 
 # ???
 # -add ability to rerun games under a different model?
 # -show: add --persistent mode to constantly refresh results?
 # -switch to JSON for db/games/msg?
 # -add an option to update default config? (psyleague config -> psyleague config new)
+# -add option to use a different config? 
 
 
 
@@ -169,7 +175,12 @@ def load_all_games() -> List[Game]:
         data = f.readlines()
     return [Game(str=s.strip()) for s in data]
 
-# TODO: write to file first and then output with a single call?
+def save_all_game(games: List[Game]) -> None:
+    with portalocker.Lock(cfg['file_games'], 'w', **lock_args) as f:
+        for g in games:
+            f.write(str(g) + '\n')
+
+# TODO: write to string first and then output with a single call?
 def save_db(bots: Dict[str, Bot]) -> None:
     with portalocker.Lock(cfg['file_db'], 'w', **lock_args) as f:
         for b in bots.values():
@@ -329,9 +340,20 @@ def mode_run() -> None:
                     save_db(bots)
                 elif msg_type == 'UPDATE_BOT':
                     name = a[1]
-                    new_name = a[2] # XXX: OPERATION NOT SUPPORTED
+                    new_name = a[2]
                     description = a[3]
                     bots[name].description = description
+                    if new_name != name:
+                        bots[new_name] = bots[name]
+                        bots[new_name].name = new_name
+                        del bots[name]
+                        games = load_all_games()
+                        for g in games:
+                            if g.p1 == name:
+                                g.p1 = new_name
+                            if g.p2 == name:
+                                g.p2 = new_name
+                        save_all_game(games)
                     save_db(bots)
                 else:
                     assert False, f'Unknown message type: {msg_type}'
@@ -352,6 +374,9 @@ def mode_run() -> None:
                     game = results_queue.get(block=False)
                     if args.verbose:
                         print(f'Processing result: {game.p1} vs {game.p2}, outcome: {game.rank1} {game.rank2}')
+                    if game.p1 not in bots or game.p2 not in bots:
+                        print(f'Warning: Unknown bot in game: {game.p1} vs {game.p2}; skipping game')
+                        continue
                     add_game(game)
                     update_ranking(bots, game)
                     save_db(bots) 
@@ -432,7 +457,7 @@ def mode_bot() -> None:
             return
             
         log(f'[Action] Update Bot {args.name}')
-        send_msg(f'UPDATE_BOT : {args.name} : {args.name} : {args.description}')
+        send_msg(f'UPDATE_BOT : {args.name} : {args.new_name or args.name} : {args.description}')
     else:
         assert False, f'Uknown bot command: {args.cmd}'
 
@@ -471,7 +496,6 @@ def mode_show() -> None:
         print(f'Your date_format: "{cfg["date_format"]}" is invalid')
         sys.exit(1)
         
-    
     headers = []
     table = []
     for column_name in cfg['leaderboard'].split(','):
@@ -520,6 +544,7 @@ def _main() -> None:
     parser_bot.add_argument('name', help='name of the bot')
     parser_bot.add_argument('-s', '--src', type=str, default=None, help='source file, if not provided defaults to NAME (used in add)')
     parser_bot.add_argument('-d', '--description', type=str, default='n/a', help='description of the bot (used in add/update)')
+    parser_bot.add_argument('-n', '--new-name', type=str, default=None, help='new name of the bot (used in update)')
 
     parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots')
     parser_show.set_defaults(func=mode_show)
