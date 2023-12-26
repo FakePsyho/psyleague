@@ -237,8 +237,13 @@ def play_game(bots: List[str], verbose: bool=False) -> Game:
     if verbose:
         print(f'{cmd} produced output: {output}')
     
-    data = [int(v) for v in output.split()]
-    return Game(bots[0], bots[1], *data)
+    if output[0] == '{':
+        data = json.loads(output)
+        data['players'] = bots
+        return Game(str=json.dumps(data))
+    else:
+        data = [int(v) for v in output.split()]
+        return Game(bots[0], bots[1], *data)
 
 
 # TODO: restore proper matchmaking 
