@@ -49,7 +49,7 @@ import queue
 import traceback
 from datetime import datetime
 from threading import Thread
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Union
 
 import tabulate
 import portalocker
@@ -137,7 +137,8 @@ class Game:
                     self.errors = [int(v[4]), int(v[5])]
             
     def __repr__(self):
-        return json.dumps(self.__dict__)    
+        return json.dumps(self.__dict__)
+        
 #endregion    
 
 #region "DB" functions
@@ -214,7 +215,7 @@ def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
     bots[game.players[1]].errors += game.errors[1]
     
 
-def play_game(bots: List[str], verbose: bool=False) -> Game:
+def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
     # TODO: add error handling?
     cmd = cfg['cmd_play_game']
     cmd = cmd.replace('%DIR%', cfg['dir_bots'])
@@ -241,6 +242,11 @@ def play_game(bots: List[str], verbose: bool=False) -> Game:
         data = json.loads(output)
         data['players'] = bots
         return Game(str=json.dumps(data))
+    elif output[0] == '[':
+        data = json.loads(output)
+        for d in data:
+            d['players'] = bots
+        return [Game(str=json.dumps(d)) for d in data]
     else:
         data = [int(v) for v in output.split()]
         return Game(bots[0], bots[1], *data)
@@ -307,8 +313,11 @@ def mode_run() -> None:
                     players = games_queue.get(block=False)
                     if players is None: 
                         break
-                    game = play_game(players, args.verbose)
-                    results_queue.put(game)
+                    games = play_games(players, args.verbose)
+                    if isinstance(games, Game):
+                        games = [games]
+                    for game in games:
+                        results_queue.put(game)
                 except queue.Empty:
                     time.sleep(0.1)
                 except KeyboardInterrupt:
