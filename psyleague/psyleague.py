@@ -5,7 +5,6 @@
 
 #TODO:
 # HIGH PRIORITY
-# -add a way to return results of multiple games with a single call to the script
 # -add mode for displaying stats for particular bot
 # -better argparse help
 # -add a nice way of renaming bots (requires updating games history :/)
@@ -15,7 +14,6 @@
 # -add comments to config file
 # -add a way to add information about the game (info about generated map), similar system to [DATA] in psytester
 # -add a way to filer results by test type
-# -play_game.py could return json as well (easier in case of returning more data?); if it starts with { assume it's json
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
 
@@ -213,7 +211,14 @@ def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
     bots[game.players[1]].games += 1
     bots[game.players[0]].errors += game.errors[0]
     bots[game.players[1]].errors += game.errors[1]
-    
+
+
+def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
+    new_bots = {b.name: Bot(b.name, b.description) for b in bots.values()}
+    for game in games:
+        update_ranking(new_bots, game)
+    return new_bots
+
 
 def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
     # TODO: add error handling?
@@ -348,11 +353,6 @@ def mode_run() -> None:
                     # TODO: add some error checking
                     bots[name] = Bot(name, description)
                     save_db(bots)
-                elif msg_type == 'STOP_BOT':
-                    name = a[1]
-                    # TODO: add some error checking
-                    bots[name].active = 0
-                    save_db(bots)
                 elif msg_type == 'UPDATE_BOT':
                     name = a[1]
                     new_name = a[2]
@@ -369,6 +369,22 @@ def mode_run() -> None:
                             if g.players[1] == name:
                                 g.players[1] = new_name
                         save_all_game(games)
+                    save_db(bots)
+                elif msg_type == 'STOP_BOT':
+                    name = a[1]
+                    # TODO: add some error checking
+                    bots[name].active = 0
+                    save_db(bots)
+                elif msg_type == 'REMOVE_BOT':
+                    games = load_all_games()
+                    games_no = len(games)
+                    name = a[1]
+                    games = [g for g in games if g.players[0] != name and g.players[1] != name]
+                    print(f'Removed {games_no - len(games)} games')
+                    del bots[name]
+                    print('Recalculating ranking')
+                    bots = recalculate_ranking(bots, games)
+                    save_all_game(games)
                     save_db(bots)
                 else:
                     assert False, f'Unknown message type: {msg_type}'
@@ -457,14 +473,6 @@ def mode_bot() -> None:
         
         log(f'[Action] Add Bot {args.name}')
         send_msg(f'ADD_BOT : {args.name} : {args.description}')
-    elif args.cmd == 'stop':
-        bots = load_db()
-        if args.name not in bots:
-            print(f'Bot {args.name} doesn\'t exist, ignoring command')
-            return
-            
-        log(f'[Action] Remove Bot {args.name}')
-        send_msg(f'STOP_BOT : {args.name}')
     elif args.cmd == 'update':
         bots = load_db()
         if args.name not in bots:
@@ -473,6 +481,22 @@ def mode_bot() -> None:
             
         log(f'[Action] Update Bot {args.name}')
         send_msg(f'UPDATE_BOT : {args.name} : {args.new_name or args.name} : {args.description}')
+    elif args.cmd == 'stop':
+        bots = load_db()
+        if args.name not in bots:
+            print(f'Bot {args.name} doesn\'t exist, ignoring command')
+            return
+            
+        log(f'[Action] Stop Bot {args.name}')
+        send_msg(f'STOP_BOT : {args.name}')
+    elif args.cmd == 'remove':
+        bots = load_db()
+        if args.name not in bots:
+            print(f'Bot {args.name} doesn\'t exist, ignoring command')
+            return
+            
+        log(f'[Action] Remove Bot {args.name}')
+        send_msg(f'REMOVE_BOT : {args.name}')
     else:
         assert False, f'Uknown bot command: {args.cmd}'
 
@@ -533,6 +557,14 @@ def mode_show() -> None:
 
     print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
 
+
+def mode_test() -> None:
+    bots = load_db()
+    games = load_all_games()
+    recalculate_ranking(bots, games)
+    for bot in bots:
+        print(f'{bot}: {bots[bot].games} {bots[bot].mu} {bots[bot].sigma}')
+
 #endregion
     
 
@@ -553,7 +585,7 @@ def _main() -> None:
 
     parser_bot = subparsers.add_parser('bot', aliases=['b'], help='commands related to adding/stopping/updating bots')
     parser_bot.set_defaults(func=mode_bot)
-    parser_bot.add_argument('cmd', choices=['add', 'stop', 'update'], help='add a new bot/stop currently active bot/update bot')
+    parser_bot.add_argument('cmd', choices=['add', 'update', 'stop', 'remove'], help='add a new bot/update bot/stop currently active bot (no more played games)/remove a bot along with games (recalculates ranking)')
     parser_bot.add_argument('name', help='name of the bot')
     parser_bot.add_argument('-s', '--src', type=str, default=None, help='source file, if not provided defaults to NAME (used in add)')
     parser_bot.add_argument('-d', '--description', type=str, default='n/a', help='description of the bot (used in add/update)')
@@ -565,6 +597,9 @@ def _main() -> None:
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
+
+    parser_test = subparsers.add_parser('test', aliases=['t'], help='test')
+    parser_test.set_defaults(func=mode_test)
 
     global args
     args = parser.parse_args()
