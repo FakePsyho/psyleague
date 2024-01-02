@@ -597,6 +597,12 @@ def mode_show() -> None:
         columns[f'pdata:{var}'.lower()] = (var, [player_vars[b.name][var] / b.games if var in player_vars[b.name] else None for b in ranking])
 
     leaderboard = cfg['leaderboard'].split(',')
+    for i, column_name in enumerate(leaderboard):
+        if column_name.lower() == 'pdata_all':
+            for var in vars:
+                leaderboard.insert(i, f'pdata:{var}')
+            leaderboard.remove('pdata_all')
+            break
         
     headers = []
     table = []
