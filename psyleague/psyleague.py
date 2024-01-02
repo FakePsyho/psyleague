@@ -334,7 +334,7 @@ def mode_run() -> None:
                     os._exit(1)
                     
                     
-        workers = [Thread(target=worker_loop) for _ in range(cfg['n_workers'])]
+        workers = [Thread(target=worker_loop) for _ in range(args.workers if args.workers is not None else cfg['n_workers'])]
         for worker in workers:
             worker.start()
             
@@ -579,9 +579,10 @@ def _main() -> None:
     
     parser_run = subparsers.add_parser('run', aliases=['r'], help='start psyleague and spin-up all of the workers')
     parser_run.set_defaults(func=mode_run)
+    parser_run.add_argument('-g', '--games', type=int, default=None, help='if specified, number of games to run after which psyleague should finish running')
+    parser_run.add_argument('-w', '--workers', type=int, default=None, help='number of workers to use (overrides config file)')
     parser_run.add_argument('-s', '--silent', action='store_true', help='turns off all of the messages')
     parser_run.add_argument('-v', '--verbose', action='store_true', help='shows extra information, good for debugging')
-    parser_run.add_argument('-g', '--games', type=int, default=None, help='if specified, number of games to run after which psyleague should finish running')
 
     parser_bot = subparsers.add_parser('bot', aliases=['b'], help='commands related to adding/stopping/updating bots')
     parser_bot.set_defaults(func=mode_bot)
