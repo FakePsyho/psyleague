@@ -8,11 +8,9 @@
 # -add mode for displaying stats for particular bot
 # -add more ranking models (openskill?)
 # -find a good ranking model for fixed-skill bots
-# -add comments to config file
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
 # -update changelog
-# -fix the problem with updating creation date when removing a bot
 # -update readme
 
 # LOW PRIORITY
@@ -228,7 +226,7 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None
 
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
-    new_bots = {b.name: Bot(b.name, b.description) for b in bots.values()}
+    new_bots = {b.name: Bot(b.name, b.description, cdate=b.cdate) for b in bots.values()}
     update_ranking(new_bots, games)
     return new_bots
 
