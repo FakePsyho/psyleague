@@ -198,25 +198,30 @@ def load_db() -> Dict[str, Bot]:
 
 #region helper functions
     
-def update_ranking(bots: Dict[str, Bot], game: Game) -> None:
+def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None:
     if cfg['model'] == 'trueskill':
         ts.setup(tau=cfg['tau'], draw_probability=cfg['draw_prob'])
-        ratings = ts.rate([[bots[game.players[0]].to_ts()], [bots[game.players[1]].to_ts()]], ranks=[game.ranks[0], game.ranks[1]])
-        bots[game.players[0]].update(ratings[0][0])
-        bots[game.players[1]].update(ratings[1][0])
     else:
         assert False, f'Invalid rating model: {cfg["model"]}'
-        
-    bots[game.players[0]].games += 1
-    bots[game.players[1]].games += 1
-    bots[game.players[0]].errors += game.errors[0]
-    bots[game.players[1]].errors += game.errors[1]
+
+    if not isinstance(games, list):
+        games = [games]
+
+    for game in games:
+        if cfg['model'] == 'trueskill':
+            ratings = ts.rate([[bots[game.players[0]].to_ts()], [bots[game.players[1]].to_ts()]], ranks=[game.ranks[0], game.ranks[1]])
+            bots[game.players[0]].update(ratings[0][0])
+            bots[game.players[1]].update(ratings[1][0])
+            
+        bots[game.players[0]].games += 1
+        bots[game.players[1]].games += 1
+        bots[game.players[0]].errors += game.errors[0]
+        bots[game.players[1]].errors += game.errors[1]
 
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
     new_bots = {b.name: Bot(b.name, b.description) for b in bots.values()}
-    for game in games:
-        update_ranking(new_bots, game)
+    update_ranking(new_bots, games)
     return new_bots
 
 
@@ -595,6 +600,7 @@ def _main() -> None:
     parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots')
     parser_show.set_defaults(func=mode_show)
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
+    # parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
