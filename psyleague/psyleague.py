@@ -6,20 +6,18 @@
 #TODO:
 # HIGH PRIORITY
 # -add mode for displaying stats for particular bot
-# -choose_match: update matchmaking (more priority to top bots)
-# -add more ranking models (openskill)
+# -add more ranking models (openskill?)
 # -find a good ranking model for fixed-skill bots
 # -add comments to config file
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
 # -update changelog
 # -add a way to specify a different config file / database?
-# -clean up small problems with aligning tabulate
-# -add support of .X format for the leaderboard
 # -fix the problem with updating creation date when removing a bot
-
+# -update readme
 
 # LOW PRIORITY
+# -choose_match: update matchmaking (more priority to top bots)
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
 # -add support for n-player games 
 # -wrapper for \r printing
@@ -137,8 +135,8 @@ class Game:
                 self.players = data['players']
                 self.ranks = data['ranks']
                 self.errors = data['errors']
-                self.test_data = data['test_data']
-                self.player_data = data['player_data']
+                self.test_data = {k: try_str_to_numeric(v) for k, v in data['test_data'].items()}
+                self.player_data = [{k: try_str_to_numeric(v) for k, v in d.items()} for d in data['player_data']]
             else:
                 v = str.split()
                 self.players = [v[0], v[1]]
@@ -549,7 +547,7 @@ def mode_show() -> None:
         if args.resample:
             random.seed(datetime.now())
             games = random.choices(games, k=args.resample)
-        print(f'Recalculating ranking using {args.resample} games')
+        print(f'Recalculating ranking using {len(games)} games')
         bots = recalculate_ranking(bots, games)
         print()
     
