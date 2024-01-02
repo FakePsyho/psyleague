@@ -12,7 +12,6 @@
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
 # -update changelog
-# -add a way to specify a different config file / database?
 # -fix the problem with updating creation date when removing a bot
 # -update readme
 
@@ -23,7 +22,6 @@
 # -wrapper for \r printing
 
 # ???
-# -add ability to rerun games under a different model?
 # -show: add --persistent mode to constantly refresh results?
 # -switch to JSON for db/games/msg?
 # -add an option to update default config? (psyleague config -> psyleague config new)
@@ -584,6 +582,8 @@ def mode_show() -> None:
     for game in games:
         for player, data in enumerate(game.player_data):
             name = game.players[player]
+            if name not in player_vars: 
+                continue
             for k, v in data.items():
                 player_vars[name][k] = player_vars[name].get(k, 0) + float(v)
 
