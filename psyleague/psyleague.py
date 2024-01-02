@@ -39,6 +39,7 @@ import time
 import shutil
 import random
 import json
+import copy
 import argparse
 import sys
 import os.path
@@ -63,6 +64,17 @@ cfg = None
 games_queue = queue.Queue()
 results_queue = queue.Queue()
 
+def try_str_to_numeric(x):
+    if x is None:
+        return None
+
+    try: 
+        return int(x)
+    except ValueError:
+        try:
+            return float(x)
+        except ValueError:
+            return x
 
 
 class RollingStat:
@@ -512,8 +524,28 @@ def mode_show() -> None:
     log('[Action] Show')
     bots = load_db()
 
-    if args.resample:
-        games = load_all_games()
+    games = load_all_games()
+    if args.resample or args.filters:
+        if args.filters:
+            available_vars = {var for game in games for var in game.test_data}
+            for filter in args.filters:
+                var, value = filter.split('=')
+                if var not in available_vars:
+                    print(f'[Error] There are no games with: {var} available vars: {available_vars}')
+                    sys.exit(1)
+                games = [game for game in games if var in game.test_data]
+                if '-' in value:
+                    lo, hi = value.split('-')
+                    lo = try_str_to_numeric(lo) if lo else min([game.test_data[var] for game in games])
+                    hi = try_str_to_numeric(hi) if hi else max([game.test_data[var] for game in games])
+                    games = [game for game in games if lo <= game.test_data[var] <= hi]
+                else:
+                    value = try_str_to_numeric(value)
+                    games = [game for game in games if game.test_data[var] == value]
+            if not games:
+                print(f'[Error] There are no games matching the filters')
+                sys.exit(1)
+                
         if args.resample:
             random.seed(datetime.now())
             games = random.choices(games, k=args.resample)
@@ -547,23 +579,45 @@ def mode_show() -> None:
     try:
         columns['date'] = ('Created', [b.cdate.strftime(cfg['date_format']) for b in ranking])
     except ValueError:
-        print(f'Your date_format: "{cfg["date_format"]}" is invalid')
+        print(f'[Error] Your date_format: "{cfg["date_format"]}" is invalid')
         sys.exit(1)
+
+    player_vars = {b.name: {} for b in ranking}
+    for game in games:
+        for player, data in enumerate(game.player_data):
+            name = game.players[player]
+            for k, v in data.items():
+                player_vars[name][k] = player_vars[name].get(k, 0) + float(v)
+
+    vars = set()
+    for name in player_vars:
+        vars.update(player_vars[name])
+
+    for var in vars:
+        columns[f'pdata:{var}'.lower()] = (var, [player_vars[b.name][var] / b.games if var in player_vars[b.name] else None for b in ranking])
+
+    leaderboard = cfg['leaderboard'].split(',')
         
     headers = []
     table = []
-    for column_name in cfg['leaderboard'].split(','):
+    for column_name in leaderboard:
         column_name = column_name.lower()
         optional = False
+        round_digits = None
         if column_name[-1] == '?':
             optional = True
             column_name = column_name[:-1]
+        if column_name[-2] == '.' and column_name[-1] in '0123456789':
+            round_digits = int(column_name[-1])
+            column_name = column_name[:-2]
         if column_name not in columns:
-            print(f'Unknown column name: {column_name}, please correct the leaderboard option')
+            print(f'[Error] Unknown column name: {column_name}, please correct the leaderboard option')
             sys.exit(1)
         h, c = columns[column_name]
         if optional and c.count(c[0]) == len(c):
             continue
+        # if round_digits is not None:
+        #     c = [f'{v:.{round_digits}f}' if v is not None else None for v in c]
         headers.append(h)
         table.append(c)
         
@@ -614,6 +668,7 @@ def _main() -> None:
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
     parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
     parser_show.add_argument('-s', '--resample', type=int, default=None, help='recalculates ranking using bootstrapping')
+    parser_show.add_argument('-f', '--filters', type=str, default=None, nargs='+', help='recalculates ranking after filtering the games)')
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
