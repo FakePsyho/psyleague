@@ -529,6 +529,7 @@ def mode_show() -> None:
     columns['name'] = ('Name', [b.name for b in ranking])
     columns['score'] = ('Score', [b.mu-3*b.sigma for b in ranking])
     columns['games'] = ('Games', [b.games for b in ranking])
+    columns['percentage'] = ('%', [f'{min(100, b.games * 100 // cfg["mm_min_matches"])}%' for b in ranking])
     columns['mu'] = ('Mu', [b.mu for b in ranking])
     columns['sigma'] = ('Sigma', [b.sigma for b in ranking])
     columns['errors'] = ('Errors', [b.errors for b in ranking])
