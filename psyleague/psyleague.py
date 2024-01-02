@@ -6,22 +6,23 @@
 #TODO:
 # HIGH PRIORITY
 # -add mode for displaying stats for particular bot
-# -better argparse help
-# -add a nice way of renaming bots (requires updating games history :/)
 # -choose_match: update matchmaking (more priority to top bots)
 # -add more ranking models (openskill)
 # -find a good ranking model for fixed-skill bots
 # -add comments to config file
-# -add a way to add information about the game (info about generated map), similar system to [DATA] in psytester
-# -add a way to filer results by test type
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
+# -update changelog
+# -add a way to specify a different config file / database?
+# -clean up small problems with aligning tabulate
+# -add support of .X format for the leaderboard
+# -fix the problem with updating creation date when removing a bot
+
 
 # LOW PRIORITY
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
 # -add support for n-player games 
 # -wrapper for \r printing
-# -add a nice way of permanently deleting a bot (requires recalculation of the whole ranking :/ )
 
 # ???
 # -add ability to rerun games under a different model?
@@ -67,7 +68,6 @@ results_queue = queue.Queue()
 def try_str_to_numeric(x):
     if x is None:
         return None
-
     try: 
         return int(x)
     except ValueError:
@@ -604,26 +604,27 @@ def mode_show() -> None:
             leaderboard.remove('pdata_all')
             break
         
+    floatfmt = []
     headers = []
     table = []
     for column_name in leaderboard:
         column_name = column_name.lower()
         optional = False
-        round_digits = None
+        rounding_digits = 3
         if column_name[-1] == '?':
             optional = True
             column_name = column_name[:-1]
         if column_name[-2] == '.' and column_name[-1] in '0123456789':
-            round_digits = int(column_name[-1])
+            rounding_digits = int(column_name[-1])
             column_name = column_name[:-2]
+
         if column_name not in columns:
-            print(f'[Error] Unknown column name: {column_name}, please correct the leaderboard option')
+            print(f'[Error] Unknown column name: {column_name}, please correct the leaderboard option in your config file')
             sys.exit(1)
         h, c = columns[column_name]
         if optional and c.count(c[0]) == len(c):
             continue
-        # if round_digits is not None:
-        #     c = [f'{v:.{round_digits}f}' if v is not None else None for v in c]
+        floatfmt.append(f'.{rounding_digits}f')
         headers.append(h)
         table.append(c)
         
@@ -632,7 +633,7 @@ def mode_show() -> None:
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
 
-    print(tabulate.tabulate(table, headers=headers, floatfmt=f'.3f'))
+    print(tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
 
 
 def mode_test() -> None:
