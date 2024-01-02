@@ -488,20 +488,22 @@ def mode_bot() -> None:
         send_msg(f'UPDATE_BOT : {args.name} : {args.new_name or args.name} : {args.description}')
     elif args.cmd == 'stop':
         bots = load_db()
-        if args.name not in bots:
-            print(f'Bot {args.name} doesn\'t exist, ignoring command')
-            return
-            
-        log(f'[Action] Stop Bot {args.name}')
-        send_msg(f'STOP_BOT : {args.name}')
+        for bot in args.name.split(','):
+            if bot not in bots:
+                print(f'Bot {bot} doesn\'t exist, ignoring command')
+                return
+        for bot in args.name.split(','):
+            log(f'[Action] Stop Bot {bot}')
+            send_msg(f'STOP_BOT : {bot}')
     elif args.cmd == 'remove':
         bots = load_db()
-        if args.name not in bots:
-            print(f'Bot {args.name} doesn\'t exist, ignoring command')
-            return
-            
-        log(f'[Action] Remove Bot {args.name}')
-        send_msg(f'REMOVE_BOT : {args.name}')
+        for bot in args.name.split(','):
+            if bot not in bots:
+                print(f'Bot {bot} doesn\'t exist, ignoring command')
+                return
+        for bot in args.name.split(','):
+            log(f'[Action] Remove Bot {bot}')
+            send_msg(f'REMOVE_BOT : {bot}')
     else:
         assert False, f'Uknown bot command: {args.cmd}'
 
