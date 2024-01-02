@@ -510,9 +510,18 @@ def mode_bot() -> None:
 
 def mode_show() -> None:
     log('[Action] Show')
-    bots = load_db().values()
+    bots = load_db()
+
+    if args.resample:
+        games = load_all_games()
+        if args.resample:
+            random.seed(datetime.now())
+            games = random.choices(games, k=args.resample)
+        print(f'Recalculating ranking using {args.resample} games')
+        bots = recalculate_ranking(bots, games)
+        print()
     
-    ranking = sorted(bots, key=lambda b: b.mu-3*b.sigma, reverse=True)
+    ranking = sorted(bots.values(), key=lambda b: b.mu-3*b.sigma, reverse=True)
 
     if args.active:
         ranking = [b for b in ranking if b.active]
@@ -603,13 +612,14 @@ def _main() -> None:
     parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots')
     parser_show.set_defaults(func=mode_show)
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
-    # parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
+    parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
+    parser_show.add_argument('-s', '--resample', type=int, default=None, help='recalculates ranking using bootstrapping')
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
 
-    parser_test = subparsers.add_parser('test', aliases=['t'], help='test')
-    parser_test.set_defaults(func=mode_test)
+    # parser_test = subparsers.add_parser('test', aliases=['t'], help='test')
+    # parser_test.set_defaults(func=mode_test)
 
     global args
     args = parser.parse_args()

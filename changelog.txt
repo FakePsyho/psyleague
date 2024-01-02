@@ -1,7 +1,8 @@
-[current]
+[0.3.0]
 * cmd_play_game: script has a new json return format + allows for returning multiple games; old format is still allowed 
 * .games file: format changed to json (allows for custom data)
 * run: --workers N overrides number of workers set in the config file
+* bot show: -s/--resample N shows ranking using bootstrapped (resampling with replacement) with N games
 * bot remove: removes bot with all games & recalculates whole ranking (might take a while to execute)
 * bot update: -n/--new_name renames bot (this is only partially supported as this doesn't change the bot executable file; warning: potentially very slow as this has to update whole .games file)
 * bot stop/remove: you can stop/remove multiple bots by specifying comma-separated list of names
