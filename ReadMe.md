@@ -10,47 +10,92 @@ You can see the latest changes in the [changelog.txt](https://github.com/FakePsy
 **Note: if you encounter any bugs/problems, feel free to contact me on twitter/discord and tell me about the issue.**
 
 ## Main Features
-- League with simple automatic matchmaking system: Start the league server, add bots, look at the results table
+- League with simple automatic matchmaking system: start the league server, add bots, look at the results table
 - Add/remove/modify bots without restarting the server
-- All data stored in human-readable format
-- Should work with all programming languages
-- [Soon!] Support for different ranking models
+- All data is stored in a human-readable format
+- Easy way of adding metadata to your games and the display those stats on the leaderboard; it also allows for rating recalculation on a specific subset of games
+- Should work with all programming languages and all possible platforms
+- [Coming in 0.4.0?] Support for different ranking models
+
+
 ## Quick Setup Guide
-- Install `psyleague`
-- Create a script that given two bots, simulates the game and prints out 4 integers on a single line: "P1_rank P2_rank P1_error P2_error". The first two are ranks of the bots, i.e. if first player wins print "0 1", if the second player wins print "1 0", in case of a draw print "0 0". The last two signify that bot crashed during the game: 0 = no error, 1 = error.
+- Install `psyleague` (via `pip install psyleague --upgrade`)
+- Create a play_game script that is invoked every time psyleague wants to run a new game. This is usually either a wrapper on a provided referee or your own game simulator. Please see [this example](#codingame-play_game-script) for explanation about the JSON format.
 - Run `psyleague config` in your contest directory to create a new config file
-- In `psyleague.cfg` you have to modify `cmd_bot_setup` and `cmd_play_game`. `cmd_bot_setup` is executed immediately when you add a new bot. `cmd_play_game` is executed when `psyleague` wants to play a single game. %DIR% -> `dir_bots` (from config), %NAME% -> `BOT_NAME`, %SRC% -> `SOURCE` (or `BOT_NAME` if `SOURCE` was not provided), %P1% & %P2% -> `BOT_NAME` of the player 1 & 2 bots.
+- In `psyleague.cfg` you have to modify `cmd_bot_setup` and `cmd_play_game`. `cmd_bot_setup` is executed immediately when you add a new bot. `cmd_play_game` is executed when `psyleague` wants to play a single game. %DIR% -> `dir_bots` (from config), %NAME% -> `BOT_NAME`, %SRC% -> `SOURCE` (or `BOT_NAME` if `SOURCE` was not provided), %P1% & %P2% -> `BOT_NAME` of the player 1 & player 2 bots.
 - Run `psyleague run` in a terminal - this is the "server" part that automatically plays games. In order to kill it, use keyboard interrupt (Ctrl+C).
 - In a different terminal, start adding bots by running `psyleague bot add BOT_NAME -s SOURCE` to add a new bot to the league. As soon as you have 2 bots added, `psyleague run` will start playing games.
 - Run `psyleague show` to see the current leaderboard
-- Remember to update `n_workers` in order to play more games simultaneously 
+- Remember to update `n_workers` (in the config or via `run --workers n_workers`) in order to play more games simultaneously 
 
-## Debugging
-- Make sure that your script for playing games works correctly and the only thing it prints to the stdout is the list of integers on a single line. Anything printed to stderr will be ignored. For example, the following python code is going to work for most of the CodinGame contests, assuming that `referee.jar` contains the modified judge that accepts two bots:
+
+## CodinGame play_game script
+Your play_game script should print a valid JSON that contains 4 fields. P refers to the number of players.
+- `ranks`: a list of length P, that describes the final placements of every player; it follows the same format as [trueskill](https://trueskill.org/) library
+- `errors`: a list of length P that describes if there was an error (timeout, crash, etc.) for a particular player
+- `test_data`: an object (dictionary) that contains metadata related to this particular test/seed.
+- `player_data`: a list of length P that contains metadata related to each of the players.
+
+The following python code should work with most of the CodinGame contests assuming `referee.jar` contains the referee. If your referee works with brutaltester it also works with psyleague.
 ```
-import sys, subprocess, random
+import sys, subprocess, random, json, tempfile, os
 if __name__ == '__main__':
-    cmd = f'java -jar referee.jar -p1 "{sys.argv[1]}" -p2 "{sys.argv[2]}" -d seed={random.randrange(0, 2**31)}'
+    f, log_file = tempfile.mkstemp(prefix='log_')
+    os.close(f)
+    seed = random.randrange(0, 2**31)
+    cmd = f'java -jar referee.jar -p1 "{sys.argv[1]}" -p2 "{sys.argv[2]}" -d seed={seed} -l "{log_file}"'
     task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     output = task.stdout.decode('UTF-8').split('\n')
-    p1_score = int(output[-5])
-    p2_score = int(output[-4])
-    print(int(p1_score < p2_score), int(p2_score < p1_score), int(p1_score < 0), int(p2_score < 0))
+    with open(log_file, 'r') as f:
+        json_log = json.load(f)
+    os.remove(log_file)
+    p1_score = json_log['scores']['0']
+    p2_score = json_log['scores']['1']
+    rv = {}
+    rv['ranks'] = [int(p1_score < p2_score), int(p2_score < p1_score)]
+    rv['errors'] = [int(p1_score < 0), int(p2_score < 0)]
+    rv['test_data'] = {'seed': seed}
+    rv['player_data'] = [{}, {}]
+    for player, key in enumerate(['0', '1']):
+        for data in json_log['errors'][key]:
+            if not data: continue
+            for line in [line.strip() for line in data.split('\n')]:
+                vs = line.split(' ')
+                if len(vs) < 4: continue
+                if vs[0] == '[TDATA]':  rv['test_data'][vs[1]] = vs[3]
+                if vs[0] == '[PDATA]':  rv['player_data'][player][vs[1]] = vs[3]
+                if vs[0] == '[PDATA+]': rv['player_data'][player][vs[1]] = rv['player_data'][player].get(vs[1], 0.0) + float(vs[3])            
+    print(json.dumps(rv))
 ```
+
+In order to add metadata to test_data, just print `[TDATA] key = value` to stderr in your bot. Similarly, print `[PDATA] key = value` for adding metadata to player_data. Use `[PDATA+] key = value` if you want to store the sum of all of the values instead only the last one.
+
+
+## Debugging
+- Most of the potential errors come from either having incorrect referee or a mistake in your play_game script. It's recommended to run your `cmd_play_game` manually and see if it correctly prints out JSON string to stdout.
 - Set `n_workers` to 1 and run server with verbose turned on: `psyleague run --verbose` to see if your `cmd_play_game` script is called correctly. 
-        
+
+	
 ## Ranking Models
 - trueskill
-	-  this is the same model that CodinGame uses, except here you have the ability to reduce `tau` so that the ranking can stabilize after a while. Unless you're running 10K+ games per bot, there's probably no reason to reduce `tau` even more. 
+	-  this is the same model that CodinGame uses, except here you have the ability to reduce `tau` so that the ranking can stabilize after a while. Unless you're running 10K+ games per bot, there's probably no reason to reduce `tau` even more.
+
+   
 ## MatchMaking
-TBD
+Matchmaking model is very simple:
+- If there are any bots with less than `mm_min_matches` games and we have "rolled" below `mm_min_matches_preference`: play a game between a bot with not enough games and a random bot
+- Otherwise: play a game between two random bots
+
+
 ## Scoreboard
 TBD
+
+
 ## Other Details
 - **`psyleague` is not going to be backward compatible. Every new version might break the format of any of the files and/or config.**
 - **Most of the referees for CodinGame detect if your bot goes above allowed time for each turn. If you spawn too many workers your bots will start timing out randomly.**
 - Config file is read only once at the startup. If you have updated config file, you have to restart `psyleague run` to reflect the changes
 - You can modify `psyleague.db` to make direct changes to the bots/stats, but don't do that while `psyleague run` is running. In order to reset everything, it's enough to delete `psyleague.db` & `psyleague.games`.
+- Currently only 2-player games are supported
 - If you want to see the list of planned changes, see [the top of the source file](https://github.com/FakePsyho/psyleague/blob/main/psyleague/psyleague.py)
-- Currently `psyleague.games` is used only for logging, but in the future you'll have the ability to recalculate ratings under a different ranking model
 
