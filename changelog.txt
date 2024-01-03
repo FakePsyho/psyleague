@@ -1,13 +1,18 @@
 [0.3.0]
-* cmd_play_game: script has a new json return format + allows for returning multiple games; old format is still allowed 
-* .games file: format changed to json (allows for custom data)
-* run: --workers N overrides number of workers set in the config file
-* bot show: -s/--resample N shows ranking using bootstrapped (resampling with replacement) with N games
-* bot remove: removes bot with all games & recalculates whole ranking (might take a while to execute)
-* bot update: -n/--new_name renames bot (this is only partially supported as this doesn't change the bot executable file; warning: potentially very slow as this has to update whole .games file)
-* bot stop/remove: you can stop/remove multiple bots by specifying comma-separated list of names
+* games can now store additional custom data (per test or per player):
+    - you can use test data to recalculate ratings on a subset of games (via show --filters)
+    - you can display player data on the leaderboard (check out the config file for more information)
+    - play_game script now uses a new JSON format and allows for returning multiple games; old format has been removed
+    - .games file: format changed to JSON
+    - see readme.md for CodinGame-specific play_game script example that uses the new standard and allows for easy data extraction
+* run: -w/--workers N overrides the number of workers set in the config file
+* bot show: -s/--resample N displays the ranking using bootstrapped (resampling with replacement) with N games
+* bot remove: removes a bot along with all games and recalculates the entire ranking (execution might take a while)
+* bot update: -n/--new_name renames bot (this is only partially supported as this doesn't change the bot executable file; warning: can be slow as it updates the whole .games file)
+* bot stop/remove: you can stop/remove multiple bots by specifying a comma-separated list of names
+* some bugfixes and better error checking in a few places
 [0.2.0]
-* add support for getting error data (requires update of play_game script!)
+* add support for retrieving error data (requires update of play_game script!)
 * run: can run a fixed number of games with --games
 * show: support for custom leaderboard, new leaderboard config option defines columns to show
 * show: you can see bot's creation date, change the format with date_format config option

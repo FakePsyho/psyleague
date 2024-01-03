@@ -10,7 +10,6 @@
 # -find a good ranking model for fixed-skill bots
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
-# -update changelog
 # -update readme
 
 # LOW PRIORITY
