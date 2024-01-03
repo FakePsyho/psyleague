@@ -34,7 +34,6 @@ import time
 import shutil
 import random
 import json
-import copy
 import argparse
 import sys
 import os.path
@@ -126,19 +125,16 @@ class Game:
         self.test_data = {}
         self.player_data = [{}, {}]
         if str:
-            if str[0] == '{':
+            try:
                 data = json.loads(str)
-                self.players = data['players']
-                self.ranks = data['ranks']
-                self.errors = data['errors']
-                self.test_data = {k: try_str_to_numeric(v) for k, v in data['test_data'].items()}
-                self.player_data = [{k: try_str_to_numeric(v) for k, v in d.items()} for d in data['player_data']]
-            else:
-                v = str.split()
-                self.players = [v[0], v[1]]
-                self.ranks = [int(v[2]), int(v[3])]
-                if len(v) >= 5:
-                    self.errors = [int(v[4]), int(v[5])]
+            except json.JSONDecodeError:
+                print(f'[Error]: Game JSON is invalid: {str}')
+                sys.exit(1)
+            self.players = data['players']
+            self.ranks = data['ranks']
+            self.errors = data['errors']
+            self.test_data = {k: try_str_to_numeric(v) for k, v in data['test_data'].items()}
+            self.player_data = [{k: try_str_to_numeric(v) for k, v in d.items()} for d in data['player_data']]
             
     def __repr__(self):
         return json.dumps(self.__dict__)
@@ -254,18 +250,19 @@ def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
     if verbose:
         print(f'{cmd} produced output: {output}')
     
-    if output[0] == '{':
+    try:
         data = json.loads(output)
+    except json.JSONDecodeError:
+        print(f'[Error] Play Game command {cmd} produced invalid JSON: {output}')
+        sys.exit(1)
+
+    if (isinstance(data, dict)):
         data['players'] = bots
         return Game(str=json.dumps(data))
-    elif output[0] == '[':
-        data = json.loads(output)
+    else:
         for d in data:
             d['players'] = bots
         return [Game(str=json.dumps(d)) for d in data]
-    else:
-        data = [int(v) for v in output.split()]
-        return Game(bots[0], bots[1], *data)
 
 
 # TODO: restore proper matchmaking 
