@@ -11,6 +11,9 @@
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -change psyleague.db format to csv?
 # -update readme
+# -peek at the next message in order to do a single ranking recalculation?
+# -add option for updating model source (essentially BOT_REMOVE+BOT_ADD)?
+# -add progress bar when recalculating rating?
 
 # LOW PRIORITY
 # -choose_match: update matchmaking (more priority to top bots)
@@ -628,6 +631,45 @@ def mode_show() -> None:
     print(tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
 
 
+def mode_info() -> None:
+    bots = load_db()
+    if args.name not in bots:
+        print(f'[Error] Bot {args.name} doesn\'t exist')
+        sys.exit(1)
+    games = load_all_games()
+
+    ranking = sorted(bots.values(), key=lambda b: b.mu-3*b.sigma, reverse=True)
+
+    wins = {b.name: 0 for b in ranking}
+    losses = {b.name: 0 for b in ranking}
+    draws = {b.name: 0 for b in ranking}
+    for game in games:
+        if game.players[0] == args.name:
+            wins[game.players[1]] = wins.get(game.players[1], 0) + game.ranks[1]
+            losses[game.players[1]] = losses.get(game.players[1], 0) + game.ranks[0]
+            draws[game.players[1]] = draws.get(game.players[1], 0) + (1 - game.ranks[0] - game.ranks[1])
+        if game.players[1] == args.name:
+            wins[game.players[0]] = wins.get(game.players[0], 0) + game.ranks[0]
+            losses[game.players[0]] = losses.get(game.players[0], 0) + game.ranks[1]
+            draws[game.players[0]] = draws.get(game.players[0], 0) + (1 - game.ranks[0] - game.ranks[1])
+
+    headers = ['Pos', 'Name', 'Score', '%', 'Wins', 'Losses', 'Draws']
+    table = []
+    table.append(list(range(1, 1+len(ranking))))
+    table.append([b.name for b in ranking])
+    table.append([b.mu-3*b.sigma for b in ranking])
+    table.append([(wins[b.name] + draws[b.name]*0.5) / (wins[b.name] + losses[b.name] + draws[b.name]) * 100 if wins[b.name] + losses[b.name] + draws[b.name] else 0 for b in ranking])
+    table.append([wins[b.name] for b in ranking])
+    table.append([losses[b.name] for b in ranking])
+    table.append([draws[b.name] for b in ranking])
+
+    table = list(zip(*table)) #transpose
+        
+    if hasattr(tabulate, 'MIN_PADDING'):
+        tabulate.MIN_PADDING = 0
+
+    print(tabulate.tabulate(table, headers=headers, floatfmt='.3f', colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
+
 def mode_test() -> None:
     bots = load_db()
     games = load_all_games()
@@ -671,6 +713,11 @@ def _main() -> None:
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
+
+    parser_info = subparsers.add_parser('info', aliases=['i'], help='shows info about a particular bot')
+    parser_info.set_defaults(func=mode_info)
+    parser_info.add_argument('name', help='name of the bot')
+    parser_info.add_argument('-a', '--active', action='store_true', help='shows only active bots')
 
     # parser_test = subparsers.add_parser('test', aliases=['t'], help='test')
     # parser_test.set_defaults(func=mode_test)
