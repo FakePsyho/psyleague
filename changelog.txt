@@ -1,5 +1,6 @@
-[current]
-* info: new command to show detailed stats about specific bots (for now it's just winrates)
+[0.3.1]
+* info: new command to show detailed stats about specific bot (for now it's just winrates)
+* bugfix: PDATA_ALL now works correctly
 [0.3.0]
 * games can now store additional custom data (per test or per player):
     - you can use test data to recalculate ratings on a subset of games (via show --filters)

@@ -594,9 +594,9 @@ def mode_show() -> None:
     leaderboard = cfg['leaderboard'].split(',')
     for i, column_name in enumerate(leaderboard):
         if column_name.lower() == 'pdata_all':
+            del leaderboard[i]
             for var in vars:
                 leaderboard.insert(i, f'pdata:{var}')
-            leaderboard.remove('pdata_all')
             break
         
     floatfmt = []
