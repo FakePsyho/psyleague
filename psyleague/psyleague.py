@@ -14,12 +14,15 @@
 # -peek at the next message in order to do a single ranking recalculation?
 # -add option for updating model source (essentially BOT_REMOVE+BOT_ADD)?
 # -add progress bar when recalculating rating?
+# -show -r X / show -b X could show position in overall ranking as well
+# -auto reduce number of bots (greedily remove a bot and see how it affects the overall ranking (minimize MSE?))
 
 # LOW PRIORITY
 # -choose_match: update matchmaking (more priority to top bots)
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
 # -add support for n-player games 
 # -wrapper for \r printing
+# -rename *.db to *.bots?
 
 # ???
 # -show: add --persistent mode to constantly refresh results?
@@ -29,7 +32,7 @@
 
 
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 import signal
 import time
@@ -595,7 +598,7 @@ def mode_show() -> None:
     for i, column_name in enumerate(leaderboard):
         if column_name.lower() == 'pdata_all':
             del leaderboard[i]
-            for var in vars:
+            for var in sorted(vars, reverse=True):
                 leaderboard.insert(i, f'pdata:{var}')
             break
         
