@@ -1,6 +1,9 @@
+[current]
+* show: --recent is sorted by score & shows position in the overall ranking as well
+* [fix] PDATA_ALL is always sorted
 [0.3.1]
 * info: new command to show detailed stats about specific bot (for now it's just winrates)
-* bugfix: PDATA_ALL now works correctly
+* [fix] PDATA_ALL now works correctly
 [0.3.0]
 * games can now store additional custom data (per test or per player):
     - you can use test data to recalculate ratings on a subset of games (via show --filters)
@@ -21,9 +24,9 @@
 * show: you can see bot's creation date, change the format with date_format config option
 * show: --limit -> --best
 * show: added --recent to show the most recent X created bots
-* bugfix: psyleague show --active had no effect
-* bugfix: logs show your local timezone now
+* [fix] psyleague show --active had no effect
+* [fix] logs show your local timezone now
 [0.1.1]
-* bugfixes: psyleague config, psyleague bot update -d, installation, linux support
+* [fixes] psyleague config, psyleague bot update -d, installation, linux support
 [0.1.0] 
 * initial version

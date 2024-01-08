@@ -14,7 +14,6 @@
 # -peek at the next message in order to do a single ranking recalculation?
 # -add option for updating model source (essentially BOT_REMOVE+BOT_ADD)?
 # -add progress bar when recalculating rating?
-# -show -r X / show -b X could show position in overall ranking as well
 # -auto reduce number of bots (greedily remove a bot and see how it affects the overall ranking (minimize MSE?))
 
 # LOW PRIORITY
@@ -29,8 +28,6 @@
 # -switch to JSON for db/games/msg?
 # -add an option to update default config? (psyleague config -> psyleague config new)
 # -add option to use a different config? 
-
-
 
 __version__ = '0.3.1'
 
@@ -557,12 +554,16 @@ def mode_show() -> None:
     if args.best:
         ranking = ranking[:args.best]
         
+    original_pos = None
     if args.recent:
+        original_pos = {b.name: i+1 for i, b in enumerate(ranking)}
         ranking = sorted(ranking, key=lambda b: b.cdate, reverse=True)
         ranking = ranking[:args.recent]
+        ranking = sorted(ranking, key=lambda b: b.mu-3*b.sigma, reverse=True)
+        
     
     columns = {}
-    columns['pos'] = ('Pos', list(range(1, 1+len(ranking))))
+    columns['pos'] = ('Pos', list(range(1, 1+len(ranking))) if original_pos is None else [f'{i+1} ({original_pos[b.name]})' for i, b in enumerate(ranking)])
     columns['name'] = ('Name', [b.name for b in ranking])
     columns['score'] = ('Score', [b.mu-3*b.sigma for b in ranking])
     columns['games'] = ('Games', [b.games for b in ranking])
