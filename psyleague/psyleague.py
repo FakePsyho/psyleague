@@ -51,6 +51,7 @@ import portalocker
 import trueskill as ts
 import openskill 
 import toml
+import curses
 
 CONFIG_FILE = 'psyleague.cfg'
 
@@ -512,9 +513,7 @@ def mode_bot() -> None:
     else:
         assert False, f'Uknown bot command: {args.cmd}'
 
-
-def mode_show() -> None:
-    log('[Action] Show')
+def show():
     bots = load_db()
 
     games = load_all_games()
@@ -632,7 +631,26 @@ def mode_show() -> None:
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
 
-    print(tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
+    return tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2))
+
+def show_persistent(stdscr):
+    curses.curs_set(0)  # Hide the cursor
+    stdscr.clear()
+    try:
+        while True:
+            stdscr.clear()
+            stdscr.addstr(0, 0, show())
+            stdscr.refresh()
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print('\nInterrupted by user, waiting for all workers to finish!')
+
+def mode_show() -> None:
+    log('[Action] Show')
+    if args.persistent:
+        curses.wrapper(show_persistent)
+    else:
+        print(show())
 
 
 def mode_info() -> None:
@@ -714,6 +732,7 @@ def _main() -> None:
     parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
     parser_show.add_argument('-s', '--resample', type=int, default=None, help='recalculates ranking using bootstrapping')
     parser_show.add_argument('-f', '--filters', type=str, default=None, nargs='+', help='recalculates ranking after filtering the games)')
+    parser_show.add_argument('-p', '--persistent', action='store_true', help='shows continuously with 1sec refresh rate')
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
