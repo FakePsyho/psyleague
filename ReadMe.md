@@ -44,8 +44,7 @@ if __name__ == '__main__':
     os.close(f)
     seed = random.randrange(0, 2**31)
     cmd = f'java -jar referee.jar -p1 "{sys.argv[1]}" -p2 "{sys.argv[2]}" -d seed={seed} -l "{log_file}"'
-    task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    output = task.stdout.decode('UTF-8').split('\n')
+    task = subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with open(log_file, 'r') as f:
         json_log = json.load(f)
     os.remove(log_file)
