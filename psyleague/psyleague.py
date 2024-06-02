@@ -15,6 +15,7 @@
 # -add option for updating model source (essentially BOT_REMOVE+BOT_ADD)?
 # -add progress bar when recalculating rating?
 # -auto reduce number of bots (greedily remove a bot and see how it affects the overall ranking (minimize MSE?))
+# -add error checking to CG play_game.py (file not existing & problem with parsing JSON)
 
 # LOW PRIORITY
 # -choose_match: update matchmaking (more priority to top bots)
@@ -29,7 +30,7 @@
 # -add an option to update default config? (psyleague config -> psyleague config new)
 # -add option to use a different config? 
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
 
 import signal
 import time
@@ -120,12 +121,12 @@ class Bot:
 
     
 class Game:
-    def __init__(self, p1=None, p2=None, rank1=None, rank2=None, error1=0, error2=0, *, str=None):
-        self.players = [p1, p2]
-        self.ranks = [rank1, rank2]
-        self.errors = [error1, error2]
+    def __init__(self, players=None, ranks=None, errors=None, *, str=None):
+        self.players = players
+        self.ranks = ranks
+        self.errors = errors
         self.test_data = {}
-        self.player_data = [{}, {}]
+        self.player_data = [{} for _ in range(cfg['n_players'])]
         if str:
             try:
                 data = json.loads(str)
@@ -147,7 +148,7 @@ class Game:
 
 def load_config(path: str) -> Dict[str, Any]:
     with open(path, 'r') as f:
-        return toml.load(f);
+        return toml.load(f)
     
 lock_args = {'timeout': 2.0, 'check_interval': 0.02}
     
@@ -213,14 +214,13 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None
 
     for game in games:
         if cfg['model'] == 'trueskill':
-            ratings = ts.rate([[bots[game.players[0]].to_ts()], [bots[game.players[1]].to_ts()]], ranks=[game.ranks[0], game.ranks[1]])
-            bots[game.players[0]].update(ratings[0][0])
-            bots[game.players[1]].update(ratings[1][0])
+            ratings = ts.rate([(bots[player].to_ts(), ) for player in game.players], ranks=game.ranks)
+            for i, player in enumerate(game.players):
+                bots[player].update(ratings[i][0])
             
-        bots[game.players[0]].games += 1
-        bots[game.players[1]].games += 1
-        bots[game.players[0]].errors += game.errors[0]
-        bots[game.players[1]].errors += game.errors[1]
+        for i, player in enumerate(game.players):
+            bots[player].games += 1
+            bots[player].errors += game.errors[i]
 
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
@@ -233,8 +233,10 @@ def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
     # TODO: add error handling?
     cmd = cfg['cmd_play_game']
     cmd = cmd.replace('%DIR%', cfg['dir_bots'])
-    cmd = cmd.replace('%P1%', bots[0])
-    cmd = cmd.replace('%P2%', bots[1])
+    for i in range(4):
+        tag = f'%P{i+1}%'
+        if tag in cmd:
+            cmd = cmd.replace(tag, bots[i])
     
     if verbose:
         print(f'Playing Game: {cmd}')
@@ -271,10 +273,11 @@ def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
 def choose_match(bots: Dict[str, Bot]) -> List[str]:
     l_bots = [b for b in bots.values() if b.active]
 
-    if len(l_bots) < 2: 
+    if len(l_bots) < 2 or not cfg['mm_allow_same_player'] and len(l_bots) < cfg['n_players']: 
         return None
+    
         
-    # find p1
+    # find first player
     min_bots = [b for b in l_bots if b.games < cfg['mm_min_matches']]
     selected_bot = None
     if len(min_bots) and random.random() < cfg['mm_min_matches_preference']:
@@ -282,13 +285,21 @@ def choose_match(bots: Dict[str, Bot]) -> List[str]:
     else:
         p1 = random.choice(l_bots)
         
-    # find p2
+    # find remaining players
     while True:
-        p2 = random.choice(l_bots)
-        if p1.name != p2.name:
+        players = [p1.name]
+        for _ in range(cfg['n_players'] - 1):
+            while True:
+                p = random.choice(l_bots).name
+                if cfg['mm_allow_same_player'] or p not in players:
+                    players.append(p)
+                    break   
+        if any([p != p1 for p in players]):
             break
    
-    return [p1.name, p2.name] if random.random() < 0.5 else [p2.name, p1.name]
+    # shuffle players
+    random.shuffle(players)
+    return players
 
 #endregion
 
