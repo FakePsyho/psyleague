@@ -232,6 +232,13 @@ def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bo
 def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
     # TODO: add error handling?
     cmd = cfg['cmd_play_game']
+    if '%ALL_PLAYERS%' in cmd:
+        words = cmd.split()
+        for i, word in enumerate(words):
+            if '%ALL_PLAYERS%' in word:
+                words[i] = ' '.join([words[i].replace('%ALL_PLAYERS%', f'%P{j+1}%') for j in range(cfg['n_players'])])
+        cmd = ' '.join(words)
+        
     cmd = cmd.replace('%DIR%', cfg['dir_bots'])
     for i in range(4):
         tag = f'%P{i+1}%'
@@ -241,9 +248,9 @@ def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
     if verbose:
         print(f'Playing Game: {cmd}')
     
-    if os.name == 'nt':
+    if os.name == 'nt': # windows
         task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-    else:
+    else: 
         task = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
             
     if task.returncode:
@@ -269,13 +276,11 @@ def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
         return [Game(str=json.dumps(d)) for d in data]
 
 
-# TODO: restore proper matchmaking 
 def choose_match(bots: Dict[str, Bot]) -> List[str]:
     l_bots = [b for b in bots.values() if b.active]
 
     if len(l_bots) < 2 or not cfg['mm_allow_same_player'] and len(l_bots) < cfg['n_players']: 
-        return None
-    
+        return None    
         
     # find first player
     min_bots = [b for b in l_bots if b.games < cfg['mm_min_matches']]
@@ -297,7 +302,6 @@ def choose_match(bots: Dict[str, Bot]) -> List[str]:
         if any([p != p1 for p in players]):
             break
    
-    # shuffle players
     random.shuffle(players)
     return players
 
@@ -467,6 +471,7 @@ def mode_run() -> None:
             worker.join()
     except:
         os._exit(1)
+
 
 def mode_bot() -> None:
     if args.cmd == 'add':
@@ -684,6 +689,7 @@ def mode_info() -> None:
         tabulate.MIN_PADDING = 0
 
     print(tabulate.tabulate(table, headers=headers, floatfmt='.3f', colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
+
 
 def mode_test() -> None:
     bots = load_db()
