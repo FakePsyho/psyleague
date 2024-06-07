@@ -279,7 +279,7 @@ def play_games(bots: List[str], verbose: bool=False) -> Union[Game, List[Game]]:
 def choose_match(bots: Dict[str, Bot]) -> List[str]:
     l_bots = [b for b in bots.values() if b.active]
 
-    if len(l_bots) < 2 or not cfg['mm_allow_same_player'] and len(l_bots) < cfg['n_players']: 
+    if len(l_bots) < cfg['n_players']: 
         return None    
         
     # find first player
@@ -296,7 +296,7 @@ def choose_match(bots: Dict[str, Bot]) -> List[str]:
         for _ in range(cfg['n_players'] - 1):
             while True:
                 p = random.choice(l_bots).name
-                if cfg['mm_allow_same_player'] or p not in players:
+                if p not in players:
                     players.append(p)
                     break   
         if any([p != p1 for p in players]):
