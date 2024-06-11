@@ -30,7 +30,7 @@
 # -add an option to update default config? (psyleague config -> psyleague config new)
 # -add option to use a different config? 
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 import signal
 import time
