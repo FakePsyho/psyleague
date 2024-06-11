@@ -1,3 +1,5 @@
+[0.4.1]
+* [fix] info, bot remove, bot update should correctly work games with 3+ players
 [0.4.0]
 * support for games with 3+ players (requires updating n_players & cmd_play_game in the cfg file); example play_game script is updated as well
 * show: --recent is sorted by score & shows position in the overall ranking as well

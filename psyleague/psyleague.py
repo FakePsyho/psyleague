@@ -389,10 +389,7 @@ def mode_run() -> None:
                         del bots[name]
                         games = load_all_games()
                         for g in games:
-                            if g.players[0] == name:
-                                g.players[0] = new_name
-                            if g.players[1] == name:
-                                g.players[1] = new_name
+                            g.players = [s if s != name else new_name for s in g.players]
                         save_all_game(games)
                     save_db(bots)
                 elif msg_type == 'STOP_BOT':
@@ -404,7 +401,7 @@ def mode_run() -> None:
                     games = load_all_games()
                     games_no = len(games)
                     name = a[1]
-                    games = [g for g in games if g.players[0] != name and g.players[1] != name]
+                    games = [g for g in games if name not in g.players]
                     print(f'Removed {games_no - len(games)} games')
                     del bots[name]
                     print('Recalculating ranking')
@@ -429,9 +426,9 @@ def mode_run() -> None:
                 while True:
                     game = results_queue.get(block=False)
                     if args.verbose:
-                        print(f'Processing result: {game.players[0]} vs {game.players[1]}, outcome: {game.ranks[0]} {game.ranks[1]}')
-                    if game.players[0] not in bots or game.players[1] not in bots:
-                        print(f'Warning: Unknown bot in game: {game.players[0]} vs {game.players[1]}; skipping game')
+                        print(f'Processing result: {game.players}, outcome: {game.ranks}')
+                    if any([player not in bots for player in game.players]):
+                        print(f'Warning: Unknown bot in game: {game.players}; skipping game')
                         continue
                     add_game(game)
                     update_ranking(bots, game)
@@ -660,28 +657,31 @@ def mode_info() -> None:
 
     ranking = sorted(bots.values(), key=lambda b: b.mu-3*b.sigma, reverse=True)
 
-    wins = {b.name: 0 for b in ranking}
-    losses = {b.name: 0 for b in ranking}
-    draws = {b.name: 0 for b in ranking}
+    enemy_bots = [b for b in ranking if b.name != args.name]
+
+    wins = {b.name: 0 for b in enemy_bots}
+    losses = {b.name: 0 for b in enemy_bots}
+    draws = {b.name: 0 for b in enemy_bots}
+    
     for game in games:
-        if game.players[0] == args.name:
-            wins[game.players[1]] = wins.get(game.players[1], 0) + game.ranks[1]
-            losses[game.players[1]] = losses.get(game.players[1], 0) + game.ranks[0]
-            draws[game.players[1]] = draws.get(game.players[1], 0) + (1 - game.ranks[0] - game.ranks[1])
-        if game.players[1] == args.name:
-            wins[game.players[0]] = wins.get(game.players[0], 0) + game.ranks[0]
-            losses[game.players[0]] = losses.get(game.players[0], 0) + game.ranks[1]
-            draws[game.players[0]] = draws.get(game.players[0], 0) + (1 - game.ranks[0] - game.ranks[1])
+        for i, p1 in enumerate(game.players):
+            if p1 == args.name:
+                for j, p2 in enumerate(game.players):
+                    if i == j:
+                        continue
+                    wins[p2]   += int(game.ranks[i]  < game.ranks[j])
+                    losses[p2] += int(game.ranks[i]  > game.ranks[j])
+                    draws[p2]  += int(game.ranks[i] == game.ranks[j])
 
     headers = ['Pos', 'Name', 'Score', '%', 'Wins', 'Losses', 'Draws']
     table = []
-    table.append(list(range(1, 1+len(ranking))))
-    table.append([b.name for b in ranking])
-    table.append([b.mu-3*b.sigma for b in ranking])
-    table.append([(wins[b.name] + draws[b.name]*0.5) / (wins[b.name] + losses[b.name] + draws[b.name]) * 100 if wins[b.name] + losses[b.name] + draws[b.name] else 0 for b in ranking])
-    table.append([wins[b.name] for b in ranking])
-    table.append([losses[b.name] for b in ranking])
-    table.append([draws[b.name] for b in ranking])
+    table.append(list(range(1, 1+len(enemy_bots))))
+    table.append([b.name for b in enemy_bots])
+    table.append([b.mu-3*b.sigma for b in enemy_bots])
+    table.append([(wins[b.name] + draws[b.name]*0.5) / (wins[b.name] + losses[b.name] + draws[b.name]) * 100 if wins[b.name] + losses[b.name] + draws[b.name] else 0 for b in enemy_bots])
+    table.append([wins[b.name] for b in enemy_bots])
+    table.append([losses[b.name] for b in enemy_bots])
+    table.append([draws[b.name] for b in enemy_bots])
 
     table = list(zip(*table)) #transpose
         
