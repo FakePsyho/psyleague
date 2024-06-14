@@ -96,6 +96,5 @@ TBD
 - **Most of the referees for CodinGame detect if your bot goes above allowed time for each turn. If you spawn too many workers your bots will start timing out randomly.**
 - Config file is read only once at the startup. If you have updated config file, you have to restart `psyleague run` to reflect the changes
 - You can modify `psyleague.db` to make direct changes to the bots/stats, but don't do that while `psyleague run` is running. In order to reset everything, it's enough to delete `psyleague.db` & `psyleague.games`.
-- Currently only 2-player games are supported
 - If you want to see the list of planned changes, see [the top of the source file](https://github.com/FakePsyho/psyleague/blob/main/psyleague/psyleague.py)
 

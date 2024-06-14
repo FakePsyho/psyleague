@@ -5,7 +5,6 @@
 
 #TODO:
 # HIGH PRIORITY
-# -add mode for displaying stats for particular bot
 # -add more ranking models (openskill?)
 # -find a good ranking model for fixed-skill bots
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
@@ -20,7 +19,6 @@
 # LOW PRIORITY
 # -choose_match: update matchmaking (more priority to top bots)
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
-# -add support for n-player games 
 # -wrapper for \r printing
 # -rename *.db to *.bots?
 
