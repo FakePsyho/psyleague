@@ -23,6 +23,7 @@ You can see the latest changes in the [changelog.txt](https://github.com/FakePsy
 - Create a play_game script that is invoked every time psyleague wants to run a new game. This is usually either a wrapper on a provided referee or your own game simulator. Please see [this example](#codingame-play_game-script) for explanation about the JSON format.
 - Run `psyleague config` in your contest directory to create a new config file
 - In `psyleague.cfg` you have to modify `cmd_bot_setup` and `cmd_play_game`. `cmd_bot_setup` is executed immediately when you add a new bot. `cmd_play_game` is executed when `psyleague` wants to play a single game. %DIR% -> `dir_bots` (from config), %NAME% -> `BOT_NAME`, %SRC% -> `SOURCE` (or `BOT_NAME` if `SOURCE` was not provided), %P1% & %P2% -> `BOT_NAME` of the player 1 & player 2 bots.
+- If your game has more than 2 players, you should change `n_players` in the config.
 - Run `psyleague run` in a terminal - this is the "server" part that automatically plays games. In order to kill it, use keyboard interrupt (Ctrl+C).
 - In a different terminal, start adding bots by running `psyleague bot add BOT_NAME -s SOURCE` to add a new bot to the league. As soon as you have 2 bots added, `psyleague run` will start playing games.
 - Run `psyleague show` to see the current leaderboard
