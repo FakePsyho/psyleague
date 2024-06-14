@@ -15,7 +15,7 @@ You can see the latest changes in the [changelog.txt](https://github.com/FakePsy
 - All data is stored in a human-readable format
 - Easy way of adding metadata to your games and the display those stats on the leaderboard; it also allows for rating recalculation on a specific subset of games
 - Should work with all programming languages and all possible platforms
-- [Coming in 0.4.0?] Support for different ranking models
+- [Coming in 0.5.0?] Support for different ranking models
 
 
 ## Quick Setup Guide
