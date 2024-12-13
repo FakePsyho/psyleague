@@ -222,7 +222,7 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None
 
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
-    new_bots = {b.name: Bot(b.name, b.description, cdate=b.cdate) for b in bots.values()}
+    new_bots = {b.name: Bot(b.name, b.description, cdate=b.cdate, active=b.active) for b in bots.values()}
     update_ranking(new_bots, games)
     return new_bots
 
