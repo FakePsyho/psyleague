@@ -1,4 +1,5 @@
 [current]
+* show: --include/--exclude recalculates ranking after include/excluding all bots matching specified regexes
 * [fix] any ranking recalculation (usually removing a bot) would reset active status of all remaining bots 
 [0.4.1]
 * [fix] info, bot remove, bot update should correctly work games with 3+ players
@@ -17,7 +18,7 @@
     - .games file: format changed to JSON
     - see readme.md for CodinGame-specific play_game script example that uses the new standard and allows for easy data extraction
 * run: -w/--workers N overrides the number of workers set in the config file
-* bot show: -s/--resample N displays the ranking using bootstrapped (resampling with replacement) with N games
+* show: -s/--resample N displays the ranking using bootstrapped (resampling with replacement) with N games
 * bot remove: removes a bot along with all games and recalculates the entire ranking (execution might take a while)
 * bot update: -n/--new_name renames bot (this is only partially supported as this doesn't change the bot executable file; warning: can be slow as it updates the whole .games file)
 * bot stop/remove: you can stop/remove multiple bots by specifying a comma-separated list of names

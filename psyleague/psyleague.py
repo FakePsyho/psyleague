@@ -30,6 +30,7 @@
 
 __version__ = '0.4.1'
 
+import re
 import signal
 import time
 import shutil
@@ -178,7 +179,7 @@ def load_all_games() -> List[Game]:
         data = f.readlines()
     return [Game(str=s.strip()) for s in data]
 
-def save_all_game(games: List[Game]) -> None:
+def save_all_games(games: List[Game]) -> None:
     with portalocker.Lock(cfg['file_games'], 'w', **lock_args) as f:
         for g in games:
             f.write(str(g) + '\n')
@@ -388,7 +389,7 @@ def mode_run() -> None:
                         games = load_all_games()
                         for g in games:
                             g.players = [s if s != name else new_name for s in g.players]
-                        save_all_game(games)
+                        save_all_games(games)
                     save_db(bots)
                 elif msg_type == 'STOP_BOT':
                     name = a[1]
@@ -404,7 +405,7 @@ def mode_run() -> None:
                     del bots[name]
                     print('Recalculating ranking')
                     bots = recalculate_ranking(bots, games)
-                    save_all_game(games)
+                    save_all_games(games)
                     save_db(bots)
                 else:
                     assert False, f'Unknown message type: {msg_type}'
@@ -529,7 +530,7 @@ def mode_show() -> None:
     bots = load_db()
 
     games = load_all_games()
-    if args.resample or args.filters:
+    if args.resample or args.filters or args.include or args.exclude:
         if args.filters:
             available_vars = {var for game in games for var in game.test_data}
             for filter in args.filters:
@@ -549,14 +550,29 @@ def mode_show() -> None:
             if not games:
                 print(f'[Error] There are no games matching the filters')
                 sys.exit(1)
+
+        if args.include or args.exclude:
+            players = set(bots.keys())
+
+            if args.include:
+                players = set()
+                for pattern in args.include:
+                    players.update([b for b in bots if re.match(pattern, b)])
+            if args.exclude:
+                for pattern in args.exclude:
+                    players.difference_update([b for b in bots if re.match(pattern, b)])
+
+            games = [game for game in games if all([p in players for p in game.players])]
+            bots = {b: bots[b] for b in players}
                 
         if args.resample:
             random.seed(datetime.now())
             games = random.choices(games, k=args.resample)
+
         print(f'Recalculating ranking using {len(games)} games')
         bots = recalculate_ranking(bots, games)
         print()
-    
+
     ranking = sorted(bots.values(), key=lambda b: b.mu-3*b.sigma, reverse=True)
 
     if args.active:
@@ -578,7 +594,7 @@ def mode_show() -> None:
     columns['name'] = ('Name', [b.name for b in ranking])
     columns['score'] = ('Score', [b.mu-3*b.sigma for b in ranking])
     columns['games'] = ('Games', [b.games for b in ranking])
-    columns['percentage'] = ('%', [f'{min(100, b.games * 100 // cfg["mm_min_matches"])}%' for b in ranking])
+    columns['percentage'] = ('%', [f'{min(100, b.games * 100 // cfg['mm_min_matches'])}%' for b in ranking])
     columns['mu'] = ('Mu', [b.mu for b in ranking])
     columns['sigma'] = ('Sigma', [b.sigma for b in ranking])
     columns['errors'] = ('Errors', [b.errors for b in ranking])
@@ -723,12 +739,14 @@ def _main() -> None:
     parser_bot.add_argument('-d', '--description', type=str, default='n/a', help='description of the bot (used in add/update)')
     parser_bot.add_argument('-n', '--new-name', type=str, default=None, help='new name of the bot (used in update)')
 
-    parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots')
+    parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots\n-s/-f/-i/-x requires recalculating ranking (which may take a while)')
     parser_show.set_defaults(func=mode_show)
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
     parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
     parser_show.add_argument('-s', '--resample', type=int, default=None, help='recalculates ranking using bootstrapping')
     parser_show.add_argument('-f', '--filters', type=str, default=None, nargs='+', help='recalculates ranking after filtering the games)')
+    parser_show.add_argument('-i', '--include', type=str, default=None, nargs='+', help='recalculates ranking including only bots matching specified regexes (note: only games with all bots present are considered)')
+    parser_show.add_argument('-x', '--exclude', type=str, default=None, nargs='+', help='recalculates ranking excluding bots matching specified regexes')
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
