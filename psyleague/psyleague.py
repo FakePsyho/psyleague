@@ -47,6 +47,7 @@ from threading import Thread
 from typing import List, Dict, Tuple, Any, Union
 
 import tabulate
+import colorama
 import portalocker
 import trueskill as ts
 import openskill 
@@ -525,11 +526,39 @@ def mode_bot() -> None:
         assert False, f'Uknown bot command: {args.cmd}'
 
 
+def parse_color(color):
+    color = color.upper()
+    style = colorama.Style.NORMAL
+    if '_' in color:
+        style, color = color.split('_')
+        style = getattr(colorama.Style, style)
+    color = getattr(colorama.Fore, color) if color not in ['DEFAULT', '*'] else ''
+    return style + color    
+
+
+def init_colors():
+    even_row_cmd = ''
+    odd_row_cmd = ''
+    header_cmd = ''
+    reset_cmd = ''
+    if cfg['show_colors']:
+        try:
+            colorama.init()
+            even_row_cmd = parse_color(cfg['even_row_color'])
+            odd_row_cmd  = parse_color(cfg['odd_row_color'])
+            header_cmd = parse_color(cfg['header_color'])
+            reset_cmd = colorama.Style.RESET_ALL
+        except AttributeError:
+            print(f'[Error] One of the specified colors is not valid. Refer to the cfg file for valid combinations')
+    return {'even': even_row_cmd, 'odd': odd_row_cmd, 'header': header_cmd, 'reset': reset_cmd}
+
+
 def mode_show() -> None:
     log('[Action] Show')
-    bots = load_db()
 
+    bots = load_db()
     games = load_all_games()
+
     if args.resample or args.filters or args.include or args.exclude:
         if args.filters:
             available_vars = {var for game in games for var in game.test_data}
@@ -659,7 +688,22 @@ def mode_show() -> None:
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
 
-    print(tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
+    # generate ascii table and output it using colors
+    color_cmd = init_colors()
+    # TODO: fix hardcoded colalign, since it will break if someone changes the leaderboard (NAME is left, everything else is right)
+    output = tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2))
+    parity = False
+    header = True
+    for line in output.splitlines():
+        if header:
+            if line.startswith('-'):
+                header = False
+            else:
+                line = color_cmd['header'] + line + color_cmd['reset']
+        else:
+            line = (color_cmd['even'] if parity else color_cmd['odd']) + line + color_cmd['reset']
+            parity = not parity
+        print(line)
 
 
 def mode_info() -> None:
@@ -702,7 +746,22 @@ def mode_info() -> None:
     if hasattr(tabulate, 'MIN_PADDING'):
         tabulate.MIN_PADDING = 0
 
-    print(tabulate.tabulate(table, headers=headers, floatfmt='.3f', colalign=['right', 'left'] + ['decimal']*(len(headers)-2)))
+    # generate ascii table and output it using colors
+    color_cmd = init_colors()
+    # TODO: fix hardcoded colalign, since it will break if someone changes the leaderboard (NAME is left, everything else is right)
+    output = tabulate.tabulate(table, headers=headers, floatfmt='.3f', colalign=['right', 'left'] + ['decimal']*(len(headers)-2))
+    parity = False
+    header = True
+    for line in output.splitlines():
+        if header:
+            if line.startswith('-'):
+                header = False
+            else:
+                line = color_cmd['header'] + line + color_cmd['reset']
+        else:
+            line = (color_cmd['even'] if parity else color_cmd['odd']) + line + color_cmd['reset']
+            parity = not parity
+        print(line)
 
 
 def mode_test() -> None:

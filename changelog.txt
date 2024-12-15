@@ -1,4 +1,5 @@
 [current]
+* show/info: add color support for odd/even rows (configurable via cfg)
 * show: --include/--exclude recalculates ranking after include/excluding all bots matching specified regexes
 * [fix] any ranking recalculation (usually removing a bot) would reset active status of all remaining bots 
 [0.4.1]
