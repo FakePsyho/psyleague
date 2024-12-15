@@ -24,7 +24,7 @@
 
 # ???
 # -show: add --persistent mode to constantly refresh results?
-# -switch to JSON for db/games/msg?
+# -switch to JSON for db/msg?
 # -add an option to update default config? (psyleague config -> psyleague config new)
 # -add option to use a different config? 
 
@@ -42,6 +42,7 @@ import os.path
 import subprocess
 import queue
 import traceback
+import tqdm
 from datetime import datetime
 from threading import Thread
 from typing import List, Dict, Tuple, Any, Union
@@ -203,7 +204,7 @@ def load_db() -> Dict[str, Bot]:
 
 #region helper functions
     
-def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None:
+def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], progress_bar=False) -> None:
     if cfg['model'] == 'trueskill':
         ts.setup(tau=cfg['tau'], draw_probability=cfg['draw_prob'])
     else:
@@ -211,6 +212,9 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None
 
     if not isinstance(games, list):
         games = [games]
+
+    if progress_bar:
+        games = tqdm.tqdm(games)
 
     for game in games:
         if cfg['model'] == 'trueskill':
@@ -225,7 +229,7 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game]) -> None
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
     new_bots = {b.name: Bot(b.name, b.description, cdate=b.cdate, active=b.active) for b in bots.values()}
-    update_ranking(new_bots, games)
+    update_ranking(new_bots, games, progress_bar=cfg['show_progress'])
     return new_bots
 
 
@@ -404,7 +408,7 @@ def mode_run() -> None:
                     games = [g for g in games if name not in g.players]
                     print(f'Removed {games_no - len(games)} games')
                     del bots[name]
-                    print('Recalculating ranking')
+                    print('Recalculating ranking...')
                     bots = recalculate_ranking(bots, games)
                     save_all_games(games)
                     save_db(bots)
@@ -598,7 +602,7 @@ def mode_show() -> None:
             random.seed(datetime.now())
             games = random.choices(games, k=args.resample)
 
-        print(f'Recalculating ranking using {len(games)} games')
+        print(f'Recalculating ranking using {len(games)} games...')
         bots = recalculate_ranking(bots, games)
         print()
 

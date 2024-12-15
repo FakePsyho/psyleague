@@ -11,7 +11,7 @@ setup(
     author = 'Psyho',
     url = 'https://github.com/FakePsyho/psyleague',
     keywords = ['CompetitiveProgramming', 'CodinGame', 'Tester'],
-    install_requires=['tabulate', 'colorama', 'trueskill', 'openskill', 'portalocker', 'toml'],
+    install_requires=['tabulate', 'colorama', 'tqdm', 'trueskill', 'openskill', 'portalocker', 'toml'],
     classifiers = [
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
