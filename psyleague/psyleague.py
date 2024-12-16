@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 # Author: Psyho
-# Twitter: https://twitter.com/fakepsyho
+# Twitter: twitter.com/fakepsyho
+# BlueSky: psyho.bsky.social
 
 #TODO:
 # HIGH PRIORITY
+# -run should check if this is the only instance running (lock file?)
 # -add more ranking models (openskill?)
 # -find a good ranking model for fixed-skill bots
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
@@ -768,12 +770,55 @@ def mode_info() -> None:
         print(line)
 
 
-def mode_test() -> None:
+def mode_db_recreate() -> None:
+    # TODO: confirmation prompt?
+    # TODO: what if bots are missing from db, should we add them?
+    # bots = load_db()
+    # games = load_all_games()
+    # print('Recalculating ranking...')
+    # bots = recalculate_ranking(bots, games)
+    # save_db(bots)
+    pass
+
+
+def mode_db_verify() -> None:
     bots = load_db()
     games = load_all_games()
-    recalculate_ranking(bots, games)
-    for bot in bots:
-        print(f'{bot}: {bots[bot].games} {bots[bot].mu} {bots[bot].sigma}')
+
+    if not bots and not games:
+        print('No bots and no games in the database, nothing to verify!')
+        return
+
+    issues = []
+
+    missing_bots = set()
+    for game in games:
+        for player in game.players:
+            if player not in bots and player not in missing_bots:
+                missing_bots.add(player)
+                issues.append(f'Game {game} contains an unknown player: {player}')
+                print(issues[-1])
+
+    if not issues:
+        verify_bots = recalculate_ranking(bots, games)
+        for b in bots.values():
+            if b.games != verify_bots[b.name].games:
+                issues.append(f'Bot {b.name} has {b.games} games in the database and {verify_bots[b.name].games} games in the recalculated ranking')
+            if b.errors != verify_bots[b.name].errors:
+                issues.append(f'Bot {b.name} has {b.errors} errors in the database and {verify_bots[b.name].errors} errors in the recalculated ranking')
+            if b.mu != verify_bots[b.name].mu:
+                issues.append(f'Bot {b.name} has mu {b.mu} in the database and {verify_bots[b.name].mu} in the recalculated ranking')
+
+    if not issues:
+        print('Found no issues in the database')
+        return
+    
+    print('Found the following issues in the database:')
+    for issue in issues:
+        print(issue)
+
+    
+
 
 #endregion
     
@@ -819,8 +864,12 @@ def _main() -> None:
     parser_info.add_argument('name', help='name of the bot')
     parser_info.add_argument('-a', '--active', action='store_true', help='shows only active bots')
 
-    # parser_test = subparsers.add_parser('test', aliases=['t'], help='test')
-    # parser_test.set_defaults(func=mode_test)
+    parser_db = subparsers.add_parser('db', aliases=['d'], help='operations on the database')
+    parser_db_subparsers = parser_db.add_subparsers(title='db modes', required=True)
+    parser_db_recreate = parser_db_subparsers.add_parser('recreate', help='recreates the ranking using all of the games (warning: not useful unless your db file is corrupted)')
+    parser_db_recreate.set_defaults(func=mode_db_recreate)
+    parser_db_verify = parser_db_subparsers.add_parser('verify', help='verifies the integrity of the database')
+    parser_db_verify.set_defaults(func=mode_db_verify)
 
     global args
     args = parser.parse_args()
