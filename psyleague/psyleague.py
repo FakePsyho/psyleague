@@ -102,15 +102,15 @@ class Bot:
         self.games = games
         self.errors = errors
         self.active = active
-        self.cdate = cdate or datetime.now()
+        self.cdate = cdate
         
     @classmethod
     def from_str(cls, input):
         a = [s.strip() for s in input.split(':')]
-        return cls(a[0], a[1], float(a[2]), float(a[3]), int(a[4]), int(a[5]), int(a[6]), datetime.strptime(a[7], '%Y-%m-%d %H-%M-%S'))
+        return cls(a[0], a[1], float(a[2]), float(a[3]), int(a[4]), int(a[5]), int(a[6]), datetime.strptime(a[7], '%Y-%m-%d %H-%M-%S') if a[7] != 'n/a' else None)
         
     def __repr__(self):
-        return f'{self.name} : {self.description} : {self.mu} : {self.sigma} : {self.games} : {self.errors} : {self.active} : {self.cdate.strftime("%Y-%m-%d %H-%M-%S")}'
+        return f'{self.name} : {self.description} : {self.mu} : {self.sigma} : {self.games} : {self.errors} : {self.active} : {self.cdate.strftime("%Y-%m-%d %H-%M-%S") if self.cdate else "n/a"}'
         
     def to_ts(self) -> ts.Rating:
         return ts.Rating(mu=self.mu, sigma=self.sigma)
@@ -230,7 +230,11 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], progres
 
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
-    new_bots = {b.name: Bot(b.name, b.description, cdate=b.cdate, active=b.active) for b in bots.values()}
+    new_bots = {b.name: Bot(name=b.name, description=b.description, active=b.active, cdate=b.cdate) for b in bots.values()}
+    for game in games:
+        for player in game.players:
+            if player not in new_bots:
+                new_bots[player] = Bot(name=player, description='n/a')
     update_ranking(new_bots, games, progress_bar=cfg['show_progress'])
     return new_bots
 
@@ -382,7 +386,7 @@ def mode_run() -> None:
                     name = a[1]
                     description = a[2]
                     # TODO: add some error checking
-                    bots[name] = Bot(name, description)
+                    bots[name] = Bot(name, description, cdate=datetime.now())
                     save_db(bots)
                 elif msg_type == 'UPDATE_BOT':
                     name = a[1]
@@ -636,7 +640,7 @@ def mode_show() -> None:
     columns['active'] = ('Active', [b.active for b in ranking])
     columns['description'] = ('Description', [b.description for b in ranking])
     try:
-        columns['date'] = ('Created', [b.cdate.strftime(cfg['date_format']) for b in ranking])
+        columns['date'] = ('Created', [b.cdate.strftime(cfg['date_format']) if b.cdate else "n/a" for b in ranking])
     except ValueError:
         print(f'[Error] Your date_format: "{cfg["date_format"]}" is invalid')
         sys.exit(1)
@@ -771,14 +775,20 @@ def mode_info() -> None:
 
 
 def mode_db_recreate() -> None:
-    # TODO: confirmation prompt?
-    # TODO: what if bots are missing from db, should we add them?
-    # bots = load_db()
-    # games = load_all_games()
-    # print('Recalculating ranking...')
-    # bots = recalculate_ranking(bots, games)
-    # save_db(bots)
-    pass
+    if not args.force_confirm:
+        print('WARNING:')
+        print('THIS WILL OVERWRITE ALL OF THE DATA IN THE .DB FILE!')
+        print('MAKE SURE THAT PSYLEAGUE SERVER IS NOT RUNNING!')
+        print('Type "yes" to continue: ', end='')
+        if input().strip().upper() != 'YES':
+            print('Aborting...')
+            return
+
+    bots = load_db()
+    games = load_all_games()
+    print('Recalculating ranking...')
+    bots = recalculate_ranking(bots, games)
+    save_db(bots)
 
 
 def mode_db_verify() -> None:
@@ -815,9 +825,7 @@ def mode_db_verify() -> None:
     
     print('Found the following issues in the database:')
     for issue in issues:
-        print(issue)
-
-    
+        print(issue)    
 
 
 #endregion
@@ -868,6 +876,7 @@ def _main() -> None:
     parser_db_subparsers = parser_db.add_subparsers(title='db modes', required=True)
     parser_db_recreate = parser_db_subparsers.add_parser('recreate', help='recreates the ranking using all of the games (warning: not useful unless your db file is corrupted)')
     parser_db_recreate.set_defaults(func=mode_db_recreate)
+    parser_db_recreate.add_argument('-y', '--force-confirm', action='store_true', help='skips the confirmation prompt')
     parser_db_verify = parser_db_subparsers.add_parser('verify', help='verifies the integrity of the database')
     parser_db_verify.set_defaults(func=mode_db_verify)
 

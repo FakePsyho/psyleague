@@ -1,4 +1,6 @@
 [current]
+* db recreate: new command for regenerating .db, useful if something was corrupted or after merging multiple .games files
+* db verify: new command for checking if .db is correct
 * show/info: add color support for odd/even rows (configurable via cfg)
 * show: --include/--exclude recalculates ranking after include/excluding all bots matching specified regexes
 * progress bar when performing ranking recalculation (you can turn it off via cfg)
