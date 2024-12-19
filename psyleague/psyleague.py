@@ -7,6 +7,13 @@
 #TODO:
 # HIGH PRIORITY
 # -run should check if this is the only instance running (lock file?)
+# -add option to skip errors in play_game.py
+# -db recreate should check if the server is running?
+# -add ability to show ratings for subset of games on the main scoreboard
+# -show: add --persistent X mode to constantly refresh results and X is "cooldown" between refreshes
+# -db should contain info about the rating model used?
+
+# -add option to run a mirror game before adding the bot
 # -add more ranking models (openskill?)
 # -find a good ranking model for fixed-skill bots
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
@@ -25,7 +32,6 @@
 # -rename *.db to *.bots?
 
 # ???
-# -show: add --persistent mode to constantly refresh results?
 # -switch to JSON for db/msg?
 # -add an option to update default config? (psyleague config -> psyleague config new)
 # -add option to use a different config? 
@@ -44,7 +50,6 @@ import os.path
 import subprocess
 import queue
 import traceback
-import tqdm
 from datetime import datetime
 from threading import Thread
 from typing import List, Dict, Tuple, Any, Union
@@ -53,8 +58,10 @@ import tabulate
 import colorama
 import portalocker
 import trueskill as ts
-import openskill 
+from openskill.models import *
+import choix
 import toml
+from tqdm import tqdm
 
 CONFIG_FILE = 'psyleague.cfg'
 
@@ -154,6 +161,16 @@ def load_config(path: str) -> Dict[str, Any]:
         return toml.load(f)
     
 lock_args = {'timeout': 2.0, 'check_interval': 0.02}
+
+lock_file = None
+def unique_run() -> bool:
+    try:
+        global lock_file
+        lock_file = open(cfg['file_lock'], 'a')
+        portalocker.lock(lock_file, portalocker.LOCK_EX | portalocker.LOCK_NB)
+        return True
+    except portalocker.LockException:
+        return False
     
 def log(*args) -> None:
     with portalocker.Lock(cfg['file_log'], 'a', **lock_args) as f:
@@ -216,7 +233,7 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], progres
         games = [games]
 
     if progress_bar:
-        games = tqdm.tqdm(games)
+        games = tqdm(games)
 
     for game in games:
         if cfg['model'] == 'trueskill':
@@ -331,6 +348,10 @@ def mode_config() -> None:
 
 def mode_run() -> None:
     log('[Action] Run')
+
+    if not unique_run():
+        print('[Error] Another instance of Psyleague server is already running')
+        sys.exit(1)
     
     if not args.silent:
         print('Starting Psyleague server, press Ctrl+C to kill it')
@@ -428,8 +449,7 @@ def mode_run() -> None:
                     break
                 games_left -= 1
                 games_queue.put(players)
-            # TODO: add games_left == 0 handling
-                
+            # TODO: add games_left == 0 handling                
             
             # process results
             try:
@@ -775,10 +795,13 @@ def mode_info() -> None:
 
 
 def mode_db_recreate() -> None:
+    if not unique_run():
+        print('[Error] Psyleague server is already running, aborting...')
+        sys.exit(1)
+
     if not args.force_confirm:
         print('WARNING:')
         print('THIS WILL OVERWRITE ALL OF THE DATA IN THE .DB FILE!')
-        print('MAKE SURE THAT PSYLEAGUE SERVER IS NOT RUNNING!')
         print('Type "yes" to continue: ', end='')
         if input().strip().upper() != 'YES':
             print('Aborting...')
@@ -827,9 +850,7 @@ def mode_db_verify() -> None:
     for issue in issues:
         print(issue)    
 
-
 #endregion
-    
 
 
 def _main() -> None:
