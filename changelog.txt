@@ -6,6 +6,7 @@
 * bot add: when you submit a bot, it will run a single game against itself to check for crashes before adding it to db (configurable via cfg)
 * run: only a single run is allowed
 * progress bar when performing ranking recalculation (you can turn it off via cfg)
+* rating calculation can skip errors now (configurable via cfg), useful if you want to reduce impact of random timeouts
 * [fix] any ranking recalculation (usually removing a bot) would reset active status of all remaining bots 
 [0.4.1]
 * [fix] info, bot remove, bot update should correctly work games with 3+ players

@@ -6,7 +6,6 @@
 
 #TODO:
 # HIGH PRIORITY
-# -add option to skip errors in play_game.py
 # -add ability to show ratings for subset of games on the main scoreboard
 # -show: add --persistent X mode to constantly refresh results and X is "cooldown" between refreshes
 # -db should contain info about the rating model used?
@@ -234,14 +233,18 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], progres
         games = tqdm(games)
 
     for game in games:
+        for i, player in enumerate(game.players):
+            bots[player].games += 1
+            bots[player].errors += game.errors[i]
+
+        if cfg['skip_errors'] and any(game.errors):
+            continue
+
         if cfg['model'] == 'trueskill':
             ratings = ts.rate([(bots[player].to_ts(), ) for player in game.players], ranks=game.ranks)
             for i, player in enumerate(game.players):
                 bots[player].update(ratings[i][0])
             
-        for i, player in enumerate(game.players):
-            bots[player].games += 1
-            bots[player].errors += game.errors[i]
 
 
 def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
