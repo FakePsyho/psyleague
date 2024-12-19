@@ -1,7 +1,8 @@
 [current]
 * db recreate: new command for regenerating .db, useful if something was corrupted or after merging multiple .games files
 * db verify: new command for checking if .db is correct
-* show/info: add color support for odd/even rows (configurable via cfg)
+* show/info: now supports different output formats via --output FORMAT, where FORMAT is table, json or csv
+* show/info: add color support for odd/even rows in --output table (configurable via cfg)
 * show: --include/--exclude recalculates ranking after include/excluding all bots matching specified regexes
 * bot add: when you submit a bot, it will run a single game against itself to check for crashes before adding it to db (configurable via cfg)
 * run: only a single run is allowed

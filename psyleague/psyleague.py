@@ -8,17 +8,16 @@
 # HIGH PRIORITY
 # -add ability to show ratings for subset of games on the main scoreboard
 # -show: add --persistent X mode to constantly refresh results and X is "cooldown" between refreshes
+# -run: add option to show the ranking perdiodically?
 # -db should contain info about the rating model used?
+# -change psyleague.db format to json?
 
-# -add option to run a mirror game before adding the bot
 # -add more ranking models (openskill?)
 # -find a good ranking model for fixed-skill bots
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
-# -change psyleague.db format to csv?
 # -update readme
 # -peek at the next message in order to do a single ranking recalculation?
 # -add option for updating model source (essentially BOT_REMOVE+BOT_ADD)?
-# -add progress bar when recalculating rating?
 # -auto reduce number of bots (greedily remove a bot and see how it affects the overall ranking (minimize MSE?))
 # -add error checking to CG play_game.py (file not existing & problem with parsing JSON)
 
@@ -26,10 +25,10 @@
 # -choose_match: update matchmaking (more priority to top bots)
 # -worker error shouldn't immediately interrupt main thread (small chance for corrupting results)
 # -wrapper for \r printing
-# -rename *.db to *.bots?
 
 # ???
-# -switch to JSON for db/msg?
+# -rename *.db to *.bots?
+# -switch to JSON for msg?
 # -add an option to update default config? (psyleague config -> psyleague config new)
 # -add option to use a different config? 
 
@@ -47,6 +46,7 @@ import os.path
 import subprocess
 import queue
 import traceback
+import csv
 from datetime import datetime
 from threading import Thread
 from typing import List, Dict, Tuple, Any, Union
@@ -594,6 +594,52 @@ def init_colors():
     return {'even': even_row_cmd, 'odd': odd_row_cmd, 'header': header_cmd, 'reset': reset_cmd}
 
 
+class DataTable:
+    def __init__(self, headers=None, data=None, format=None, colalign=None):
+        self.headers = headers or []
+        self.data = data or []
+        self.format = format or []
+        self.colalign = colalign or []
+
+    def add_column(self, header, data, format, colalign):
+        self.headers.append(header)
+        self.data.append(data)
+        self.format.append(format)
+        self.colalign.append(colalign)
+
+    def show(self, output):
+        assert output in ['table', 'csv', 'json']
+        data = list(zip(*self.data)) #transpose
+
+        if output == 'table':
+            if hasattr(tabulate, 'MIN_PADDING'):
+                tabulate.MIN_PADDING = 0
+
+            # generate ascii table and output it using colors
+            color_cmd = init_colors()
+            output = tabulate.tabulate(data, headers=self.headers, floatfmt=self.format, colalign=self.colalign)
+            parity = False
+            header = True
+            for line in output.splitlines():
+                if header:
+                    if line.startswith('-'):
+                        header = False
+                    else:
+                        line = color_cmd['header'] + line + color_cmd['reset']
+                else:
+                    line = (color_cmd['even'] if parity else color_cmd['odd']) + line + color_cmd['reset']
+                    parity = not parity
+                print(line)
+        elif output == 'csv':
+            writer = csv.writer(sys.stdout)
+            writer.writerow(self.headers)
+            for line in data:
+                writer.writerow([(try_str_to_numeric(f'{line[i]:{self.format[i]}}') if line[i] is not None else '') for i in range(len(self.headers))])
+        elif output == 'json':
+            for line in data:
+                print(json.dumps({self.headers[i]: try_str_to_numeric(f'{line[i]:{self.format[i]}}' if line[i] is not None else '') for i in range(len(self.headers))}))
+        
+
 def mode_show() -> None:
     log('[Action] Show')
 
@@ -700,9 +746,7 @@ def mode_show() -> None:
                 leaderboard.insert(i, f'pdata:{var}')
             break
         
-    floatfmt = []
-    headers = []
-    table = []
+    table = DataTable()
     for column_name in leaderboard:
         column_name = column_name.lower()
         optional = False
@@ -720,31 +764,12 @@ def mode_show() -> None:
         h, c = columns[column_name]
         if optional and c.count(c[0]) == len(c):
             continue
-        floatfmt.append(f'.{rounding_digits}f')
-        headers.append(h)
-        table.append(c)
-        
-    table = list(zip(*table)) #transpose
-        
-    if hasattr(tabulate, 'MIN_PADDING'):
-        tabulate.MIN_PADDING = 0
+        is_number = all(isinstance(x, (int, float)) for x in c if x is not None)
+        is_int = is_number and all([x.is_integer() for x in c if x is not None])
 
-    # generate ascii table and output it using colors
-    color_cmd = init_colors()
-    # TODO: fix hardcoded colalign, since it will break if someone changes the leaderboard (NAME is left, everything else is right)
-    output = tabulate.tabulate(table, headers=headers, floatfmt=floatfmt, colalign=['right', 'left'] + ['decimal']*(len(headers)-2))
-    parity = False
-    header = True
-    for line in output.splitlines():
-        if header:
-            if line.startswith('-'):
-                header = False
-            else:
-                line = color_cmd['header'] + line + color_cmd['reset']
-        else:
-            line = (color_cmd['even'] if parity else color_cmd['odd']) + line + color_cmd['reset']
-            parity = not parity
-        print(line)
+        table.add_column(h, c, f'.{rounding_digits}f' if is_number and not is_int else '', 'decimal' if column_name != 'name' else 'left')
+
+    table.show(args.output or cfg['show_output'])
 
 
 def mode_info() -> None:
@@ -773,36 +798,22 @@ def mode_info() -> None:
                     draws[p2]  += int(game.ranks[i] == game.ranks[j])
 
     headers = ['Pos', 'Name', 'Score', '%', 'Wins', 'Losses', 'Draws']
-    table = []
-    table.append(list(range(1, 1+len(enemy_bots))))
-    table.append([b.name for b in enemy_bots])
-    table.append([b.mu-3*b.sigma for b in enemy_bots])
-    table.append([(wins[b.name] + draws[b.name]*0.5) / (wins[b.name] + losses[b.name] + draws[b.name]) * 100 if wins[b.name] + losses[b.name] + draws[b.name] else 0 for b in enemy_bots])
-    table.append([wins[b.name] for b in enemy_bots])
-    table.append([losses[b.name] for b in enemy_bots])
-    table.append([draws[b.name] for b in enemy_bots])
+    columns = []
+    columns.append(list(range(1, 1+len(enemy_bots))))
+    columns.append([b.name for b in enemy_bots])
+    columns.append([b.mu-3*b.sigma for b in enemy_bots])
+    columns.append([(wins[b.name] + draws[b.name]*0.5) / (wins[b.name] + losses[b.name] + draws[b.name]) * 100 if wins[b.name] + losses[b.name] + draws[b.name] else 0 for b in enemy_bots])
+    columns.append([wins[b.name] for b in enemy_bots])
+    columns.append([losses[b.name] for b in enemy_bots])
+    columns.append([draws[b.name] for b in enemy_bots])
 
-    table = list(zip(*table)) #transpose
-        
-    if hasattr(tabulate, 'MIN_PADDING'):
-        tabulate.MIN_PADDING = 0
+    table = DataTable()
+    for i, column in enumerate(columns):
+        is_number = all(isinstance(x, (int, float)) for x in column)
+        is_int = is_number and all([x.is_integer() for x in column if x is not None])
+        table.add_column(headers[i], column, f'.3f' if is_number and not is_int else '', 'decimal' if i != 1 else 'left')
 
-    # generate ascii table and output it using colors
-    color_cmd = init_colors()
-    # TODO: fix hardcoded colalign, since it will break if someone changes the leaderboard (NAME is left, everything else is right)
-    output = tabulate.tabulate(table, headers=headers, floatfmt='.3f', colalign=['right', 'left'] + ['decimal']*(len(headers)-2))
-    parity = False
-    header = True
-    for line in output.splitlines():
-        if header:
-            if line.startswith('-'):
-                header = False
-            else:
-                line = color_cmd['header'] + line + color_cmd['reset']
-        else:
-            line = (color_cmd['even'] if parity else color_cmd['odd']) + line + color_cmd['reset']
-            parity = not parity
-        print(line)
+    table.show(args.output or cfg['show_output'])
 
 
 def mode_db_recreate() -> None:
@@ -890,11 +901,12 @@ def _main() -> None:
     parser_show = subparsers.add_parser('show', aliases=['s'], help='shows the current ranking for all bots\n-s/-f/-i/-x requires recalculating ranking (which may take a while)')
     parser_show.set_defaults(func=mode_show)
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
+    parser_show.add_argument('-o', '--output', choices=['table','csv','json'], default=None, help='output format of the ranking')
     parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
-    parser_show.add_argument('-s', '--resample', type=int, default=None, help='recalculates ranking using bootstrapping')
     parser_show.add_argument('-f', '--filters', type=str, default=None, nargs='+', help='recalculates ranking after filtering the games)')
     parser_show.add_argument('-i', '--include', type=str, default=None, nargs='+', help='recalculates ranking including only bots matching specified regexes (note: only games with all bots present are considered)')
     parser_show.add_argument('-x', '--exclude', type=str, default=None, nargs='+', help='recalculates ranking excluding bots matching specified regexes')
+    parser_show.add_argument('-s', '--resample', type=int, default=None, help='recalculates ranking using bootstrapping')
     parser_show_xgroup = parser_show.add_mutually_exclusive_group()
     parser_show_xgroup.add_argument('-b', '--best', type=int, default=None, help='limits ranking to the best X bots')
     parser_show_xgroup.add_argument('-r', '--recent', type=int, default=None, help='limits ranking to the most recent X bots')
@@ -903,6 +915,7 @@ def _main() -> None:
     parser_info.set_defaults(func=mode_info)
     parser_info.add_argument('name', help='name of the bot')
     parser_info.add_argument('-a', '--active', action='store_true', help='shows only active bots')
+    parser_info.add_argument('-o', '--output', choices=['table','csv','json'], default=None, help='output format of the ranking')
 
     parser_db = subparsers.add_parser('db', aliases=['d'], help='operations on the database')
     parser_db_subparsers = parser_db.add_subparsers(title='db modes', required=True)
