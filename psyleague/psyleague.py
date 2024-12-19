@@ -6,9 +6,7 @@
 
 #TODO:
 # HIGH PRIORITY
-# -run should check if this is the only instance running (lock file?)
 # -add option to skip errors in play_game.py
-# -db recreate should check if the server is running?
 # -add ability to show ratings for subset of games on the main scoreboard
 # -show: add --persistent X mode to constantly refresh results and X is "cooldown" between refreshes
 # -db should contain info about the rating model used?
@@ -523,6 +521,16 @@ def mode_bot() -> None:
         if proc.returncode:
             print(f'Setup failed with exit code {proc.returncode}')
             return
+        
+        if cfg['selfplay_check']:
+            print('Running Selfplay Check to verify the bot...')
+            players = [args.name] * cfg['n_players']
+            games = play_games(players)
+            if isinstance(games, Game):
+                games = [games]
+            if any([any(game.errors) for game in games]):
+                print('[Error] Selfplay Check failed, bot will not be added')
+                return
         
         log(f'[Action] Add Bot {args.name}')
         send_msg(f'ADD_BOT : {args.name} : {args.description}')
