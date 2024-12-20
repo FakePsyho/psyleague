@@ -1,5 +1,5 @@
 [current]
-* db recreate: new command for regenerating .db, useful if something was corrupted or after merging multiple .games files
+* db recreate: new command for regenerating .db, useful if something was corrupted or after merging multiple .games files, optionally you can shuffle all games with --shuffle
 * db verify: new command for checking if .db is correct
 * show/info: now supports different output formats via --output FORMAT, where FORMAT is table, json or csv
 * show/info: add color support for odd/even rows in --output table (configurable via cfg)

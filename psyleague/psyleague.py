@@ -831,6 +831,10 @@ def mode_db_recreate() -> None:
 
     bots = load_db()
     games = load_all_games()
+    if args.shuffle:
+        print('Shuffling games...')
+        random.shuffle(games)
+        save_all_games(games)
     print('Recalculating ranking...')
     bots = recalculate_ranking(bots, games)
     save_db(bots)
@@ -871,6 +875,7 @@ def mode_db_verify() -> None:
     print('Found the following issues in the database:')
     for issue in issues:
         print(issue)    
+
 
 #endregion
 
@@ -922,6 +927,7 @@ def _main() -> None:
     parser_db_recreate = parser_db_subparsers.add_parser('recreate', help='recreates the ranking using all of the games (warning: not useful unless your db file is corrupted)')
     parser_db_recreate.set_defaults(func=mode_db_recreate)
     parser_db_recreate.add_argument('-y', '--force-confirm', action='store_true', help='skips the confirmation prompt')
+    parser_db_recreate.add_argument('-s', '--shuffle', action='store_true', help='shuffles the games before recalculating the ranking')
     parser_db_verify = parser_db_subparsers.add_parser('verify', help='verifies the integrity of the database')
     parser_db_verify.set_defaults(func=mode_db_verify)
 
