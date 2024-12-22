@@ -491,12 +491,17 @@ def mode_run() -> None:
             games_queue.get(block=False)
     except:
         pass
-        
+
+    for _ in workers:
+        games_queue.put(None)
+
     try:
-        for _ in workers:
-            games_queue.put(None)
-        for worker in workers:
-            worker.join()
+        while True:
+            workers_running = sum(1 for w in workers if w.is_alive())
+            print(f'\rNumber of workers still running: {workers_running}                    \r', end='')
+            if workers_running == 0:
+                break
+            time.sleep(.1)
     except:
         os._exit(1)
 
