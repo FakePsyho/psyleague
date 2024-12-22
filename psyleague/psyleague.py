@@ -203,10 +203,15 @@ def save_all_games(games: List[Game]) -> None:
             f.write(str(g) + '\n')
 
 # TODO: write to string first and then output with a single call?
+saving_db = False
+
 def save_db(bots: Dict[str, Bot]) -> None:
+    global saving_db
+    saving_db = True
     with portalocker.Lock(cfg['file_db'], 'w', **lock_args) as f:
         for b in bots.values():
             f.write(f'{str(b)}\n')
+    saving_db = False
 
 def load_db() -> Dict[str, Bot]:
     if not os.path.exists(cfg['file_db']):
@@ -484,6 +489,10 @@ def mode_run() -> None:
         print('\nFatal Error in the main thread')
         traceback.print_exc()
         os._exit(1)
+
+    if saving_db:
+        save_db(bots)
+        
 
     # stop running any new games
     try:
