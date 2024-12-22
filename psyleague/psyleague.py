@@ -511,7 +511,7 @@ def mode_bot() -> None:
         if not args.src:
             args.src = args.name
         
-        cmd = cfg['cmd_bot_setup']
+        cmd = args.setup or cfg['cmd_bot_setup']
         cmd = cmd.replace('%DIR%', cfg['dir_bots'])
         cmd = cmd.replace('%NAME%', args.name)
         cmd = cmd.replace('%SRC%', args.src)
@@ -880,6 +880,12 @@ def mode_db_verify() -> None:
 #endregion
 
 
+def test():
+    bots = load_db()
+    print(json.dumps(bots[0].__dict__))
+
+
+
 def _main() -> None:
     parser = argparse.ArgumentParser(description='Local league system for bot contests\nMore help available at https://github.com/FakePsyho/psyleague \nYou can type psyleague mode --help for more information about specific mode', formatter_class=argparse.RawTextHelpFormatter)
     parser.set_defaults(func=None)
@@ -900,6 +906,7 @@ def _main() -> None:
     parser_bot.add_argument('cmd', choices=['add', 'update', 'stop', 'remove'], help='add a new bot/update bot/stop currently active bot (no more played games)/remove a bot along with games (recalculates ranking)')
     parser_bot.add_argument('name', help='name of the bot')
     parser_bot.add_argument('-s', '--src', type=str, default=None, help='source file, if not provided defaults to NAME (used in add)')
+    parser_bot.add_argument('--setup', type=str, default=None, help='overrides cmd_bot_setup from the config file (used in add)')
     parser_bot.add_argument('-d', '--description', type=str, default='n/a', help='description of the bot (used in add/update)')
     parser_bot.add_argument('-n', '--new-name', type=str, default=None, help='new name of the bot (used in update)')
 
@@ -933,6 +940,8 @@ def _main() -> None:
 
     global args
     args = parser.parse_args()
+
+    # test()
     
     if not args.func:
         parser.print_help()
