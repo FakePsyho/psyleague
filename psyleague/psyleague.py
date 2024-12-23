@@ -8,12 +8,10 @@
 # HIGH PRIORITY
 # -add ability to show ratings for subset of games on the main scoreboard
 # -show: add --persistent X mode to constantly refresh results and X is "cooldown" between refreshes
-# -run: add option to show the ranking perdiodically?
+# -run: add option to show the ranking periodically?
 # -db should contain info about the rating model used?
 # -change psyleague.db format to json?
 
-# -add more ranking models (openskill?)
-# -find a good ranking model for fixed-skill bots
 # -add a bot having only an executable? (allows for bots without source code / in a different language)
 # -update readme
 # -peek at the next message in order to do a single ranking recalculation?
@@ -47,6 +45,7 @@ import subprocess
 import queue
 import traceback
 import csv
+import numpy as np
 from datetime import datetime
 from threading import Thread
 from typing import List, Dict, Tuple, Any, Union
@@ -118,11 +117,20 @@ class Bot:
         
     def to_ts(self) -> ts.Rating:
         return ts.Rating(mu=self.mu, sigma=self.sigma)
+    
+    def to_os(self) -> PlackettLuceRating:
+        return PlackettLuceRating(mu=self.mu, sigma=self.sigma)
         
     def update(self, data) -> None:
         if isinstance(data, ts.Rating):
             self.mu = data.mu
             self.sigma = data.sigma
+        elif isinstance(data, PlackettLuceRating):
+            self.mu = data.mu
+            self.sigma = data.sigma
+        elif isinstance(data, float):
+            self.mu = data
+            self.sigma = 0
         else:
             assert False, 'Unknown rating type'
 
@@ -225,14 +233,71 @@ def load_db() -> Dict[str, Bot]:
 
 #region helper functions
     
-def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], progress_bar=False) -> None:
-    if cfg['model'] == 'trueskill':
-        ts.setup(tau=cfg['tau'], draw_probability=cfg['draw_prob'])
+def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], whole_ranking=False, progress_bar=False, model=None) -> None:
+    model = model or cfg['model']
+
+    if model == 'trueskill':
+        ts.setup(tau=cfg['model_tau'], draw_probability=cfg['model_draw_prob'])
+    elif model == 'openskill':
+        os_model = PlackettLuce(tau=cfg['model_tau'], balance=False)
+    elif model == 'global':
+        pass # nothing to initialize
     else:
         assert False, f'Invalid rating model: {cfg["model"]}'
 
     if not isinstance(games, list):
         games = [games]
+
+    if model == 'global':
+        if not whole_ranking: 
+            return
+        
+        for game in games:
+            for player in game.players:
+                bots[player].games += 1
+
+        bots_names = list(bots.keys())
+        bots_ids = {p: i for i, p in enumerate(bots.keys())}
+        games_ids = [([bots_ids[p] for p in game.players], game.ranks) for game in games]
+
+        if cfg['n_players'] == 2:
+            results_count = [[0] * len(bots) for _ in range(len(bots))]
+            for ids, ranks in games_ids:
+                if ranks[0] < ranks[1]:
+                    results_count[ids[0]][ids[1]] += 2
+                elif ranks[0] > ranks[1]:
+                    results_count[ids[1]][ids[0]] += 2
+                else:
+                    results_count[ids[0]][ids[1]] += 1
+                    results_count[ids[1]][ids[0]] += 1
+            ratings = choix.ilsr_pairwise_dense(np.array(results_count), alpha=cfg['model_alpha'])
+        else:
+            cgames = []
+            for ids, ranks in games_ids:
+                used = [False] * cfg['n_players']
+                cgame = []
+                for _ in range(cfg['n_players']):
+                    best = None
+                    count = 0
+                    for i in range(cfg['n_players']):
+                        if used[i]: 
+                            continue
+                        if best is None or ranks[i] < ranks[best]:
+                            best = i
+                            count = 1
+                            continue
+                        if ranks[i] == ranks[best]:
+                            count += 1
+                            if random.randrange(count) == 0:
+                                best = i
+                    used[best] = True
+                    cgame.append(ids[best])
+                cgames.append(cgame)
+            ratings = choix.ilsr_rankings(len(bots), cgames, alpha=cfg['model_alpha'])
+
+        for i, player in enumerate(bots_names):
+            bots[player].update((ratings[i] + 10) * cfg['model_scale'])
+        return
 
     if progress_bar:
         games = tqdm(games)
@@ -245,20 +310,27 @@ def update_ranking(bots: Dict[str, Bot], games: Union[List[Game], Game], progres
         if cfg['skip_errors'] and any(game.errors):
             continue
 
-        if cfg['model'] == 'trueskill':
+        if model == 'trueskill':
             ratings = ts.rate([(bots[player].to_ts(), ) for player in game.players], ranks=game.ranks)
             for i, player in enumerate(game.players):
                 bots[player].update(ratings[i][0])
+        elif model == 'openskill':
+            ratings = os_model.rate([[bots[player].to_os()] for player in game.players], ranks=game.ranks)
+            for i, player in enumerate(game.players):
+                bots[player].update(ratings[i][0])
+        else:
+            assert False, f'Invalid rating model: {cfg["model"]}'
+
             
 
 
-def recalculate_ranking(bots: Dict[str, Bot], games: List[Game]) -> Dict[str, Bot]:
+def recalculate_ranking(bots: Dict[str, Bot], games: List[Game], model: str = None) -> Dict[str, Bot]:
     new_bots = {b.name: Bot(name=b.name, description=b.description, active=b.active, cdate=b.cdate) for b in bots.values()}
     for game in games:
         for player in game.players:
             if player not in new_bots:
                 new_bots[player] = Bot(name=player, description='n/a')
-    update_ranking(new_bots, games, progress_bar=cfg['show_progress'])
+    update_ranking(new_bots, games, whole_ranking=True, progress_bar=cfg['show_progress'], model=model)
     return new_bots
 
 
@@ -476,7 +548,7 @@ def mode_run() -> None:
                 
             if not args.silent and not args.verbose:
                 active_bots = sum([1 for b in bots.values() if b.active])
-                print(f'\rActive Bots: {active_bots}  Games since launch: {games_played}{f" / {games_total}" if args.games else ""}  Games in the last 60s: {games_stat.get_count()}                    \r', end='')
+                print(f'\rActive Bots: {active_bots}  Games since launch: {games_played}{f' / {games_total}' if args.games else ''}  Games in the last 60s: {games_stat.get_count()}                    \r', end='')
             
             if games_played >= games_total:
                 break
@@ -491,8 +563,7 @@ def mode_run() -> None:
         os._exit(1)
 
     if saving_db:
-        save_db(bots)
-        
+        save_db(bots)        
 
     # stop running any new games
     try:
@@ -660,7 +731,7 @@ def mode_show() -> None:
     bots = load_db()
     games = load_all_games()
 
-    if args.resample or args.filters or args.include or args.exclude:
+    if args.resample or args.filters or args.include or args.exclude or args.model or cfg['model'] == 'global':
         if args.filters:
             available_vars = {var for game in games for var in game.test_data}
             for filter in args.filters:
@@ -700,7 +771,7 @@ def mode_show() -> None:
             games = random.choices(games, k=args.resample)
 
         print(f'Recalculating ranking using {len(games)} games...')
-        bots = recalculate_ranking(bots, games)
+        bots = recalculate_ranking(bots, games, model=args.model)
         print()
 
     ranking = sorted(bots.values(), key=lambda b: b.mu-3*b.sigma, reverse=True)
@@ -928,7 +999,7 @@ def _main() -> None:
     parser_show.set_defaults(func=mode_show)
     parser_show.add_argument('-a', '--active', action='store_true', help='shows only active bots')
     parser_show.add_argument('-o', '--output', choices=['table','csv','json'], default=None, help='output format of the ranking')
-    parser_show.add_argument('-m', '--model', choices=['trueskill'], default=None, help='recalculates ranking using a different model')
+    parser_show.add_argument('-m', '--model', choices=['trueskill', 'openskill', 'global'], default=None, help='recalculates ranking using a different model')
     parser_show.add_argument('-f', '--filters', type=str, default=None, nargs='+', help='recalculates ranking after filtering the games)')
     parser_show.add_argument('-i', '--include', type=str, default=None, nargs='+', help='recalculates ranking including only bots matching specified regexes (note: only games with all bots present are considered)')
     parser_show.add_argument('-x', '--exclude', type=str, default=None, nargs='+', help='recalculates ranking excluding bots matching specified regexes')
